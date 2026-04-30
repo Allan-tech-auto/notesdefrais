@@ -261,6 +261,11 @@ font-size: 11px; color: #888; text-align: center; line-height: 1.6;
   <button class="btn btn-primary" id="add-btn">+ Nouvelle dépense</button>
   <button class="btn btn-secondary" id="export-btn">⬇ Exporter en PDF</button>
 </div>
+<div class="action-row" style="margin-top: -6px;">
+  <button class="btn btn-ghost" id="backup-btn" title="Télécharge un fichier de sauvegarde (.json)">💾 Sauvegarder</button>
+  <button class="btn btn-ghost" id="restore-btn" title="Restaure depuis un fichier .json">📂 Restaurer</button>
+  <input type="file" id="restore-input" accept="application/json,.json" class="hidden">
+</div>
 
 <div class="card hidden" id="form-card">
   <div class="section-title">Nouvelle dépense</div>
@@ -915,6 +920,101 @@ async function generatePDF() {
   }
 }
 
+// ============== Sauvegarde / Restauration JSON ==============
+function backupData() {
+  if (!currentUser) return;
+  const displayName = storageGet('displayname:' + currentUser) || currentUser;
+  const payload = {
+    app: 'notes-de-frais',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    user: displayName,
+    userId: currentUser,
+    missionInfo,
+    expenses,
+  };
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const safeName = displayName.replace(/\s+/g, '_');
+  const dateStr = new Date().toISOString().split('T')[0];
+  a.href = url;
+  a.download = `Sauvegarde_NDF_${safeName}_${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showInfo('Sauvegarde téléchargée. Conservez ce fichier en lieu sûr.');
+}
+
+function triggerRestore() {
+  document.getElementById('restore-input').click();
+}
+
+function handleRestoreFile(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.app !== 'notes-de-frais' || !Array.isArray(data.expenses)) {
+        showError("Fichier invalide : ce n'est pas une sauvegarde de cet outil.");
+        return;
+      }
+      const importedCount = data.expenses.length;
+      const fromUser = data.user || 'inconnu';
+
+      let mode;
+      if (expenses.length === 0) {
+        mode = 'replace'; // rien à perdre
+      } else {
+        const choice = prompt(
+          `Sauvegarde de "${fromUser}" contenant ${importedCount} dépense(s).\n\n` +
+          `Vous avez actuellement ${expenses.length} dépense(s) enregistrée(s).\n\n` +
+          `Tapez :\n` +
+          `  R  pour REMPLACER vos données par celles de la sauvegarde\n` +
+          `  F  pour FUSIONNER (ajouter sans écraser)\n` +
+          `  (annuler pour ne rien faire)`
+        );
+        if (!choice) return;
+        const c = choice.trim().toUpperCase();
+        if (c === 'R') mode = 'replace';
+        else if (c === 'F') mode = 'merge';
+        else { showError('Choix non reconnu, restauration annulée.'); return; }
+      }
+
+      if (mode === 'replace') {
+        expenses = data.expenses;
+        missionInfo = data.missionInfo || { objet: '', periode: '' };
+      } else {
+        // Fusion : on évite les doublons d'ID
+        const existingIds = new Set(expenses.map(e => e.id));
+        const newOnes = data.expenses.filter(e => !existingIds.has(e.id));
+        expenses = expenses.concat(newOnes);
+        // missionInfo : on ne touche pas si l'utilisateur a déjà rempli
+        if (!missionInfo.objet && data.missionInfo?.objet) missionInfo.objet = data.missionInfo.objet;
+        if (!missionInfo.periode && data.missionInfo?.periode) missionInfo.periode = data.missionInfo.periode;
+      }
+
+      saveUserData();
+      document.getElementById('mission-objet').value = missionInfo.objet || '';
+      document.getElementById('mission-periode').value = missionInfo.periode || '';
+      renderSummary();
+      renderExpenseList();
+      showInfo(`Restauration effectuée (${mode === 'replace' ? 'remplacement' : 'fusion'}).`);
+    } catch (err) {
+      showError('Erreur de lecture du fichier : ' + err.message);
+    } finally {
+      // reset l'input pour permettre de réimporter le même fichier
+      document.getElementById('restore-input').value = '';
+    }
+  };
+  reader.onerror = () => showError('Impossible de lire le fichier.');
+  reader.readAsText(file);
+}
+
 // ============== Events ==============
 document.getElementById('login-btn').addEventListener('click', login);
 document.getElementById('login-input').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
@@ -924,6 +1024,9 @@ document.getElementById('cancel-btn').addEventListener('click', () => showForm(f
 document.getElementById('save-btn').addEventListener('click', saveExpense);
 document.getElementById('form-photo').addEventListener('change', handlePhoto);
 document.getElementById('export-btn').addEventListener('click', generatePDF);
+document.getElementById('backup-btn').addEventListener('click', backupData);
+document.getElementById('restore-btn').addEventListener('click', triggerRestore);
+document.getElementById('restore-input').addEventListener('change', handleRestoreFile);
 document.getElementById('mission-objet').addEventListener('input', e => { missionInfo.objet = e.target.value; saveUserData(); });
 document.getElementById('mission-periode').addEventListener('input', e => { missionInfo.periode = e.target.value; saveUserData(); });
 
