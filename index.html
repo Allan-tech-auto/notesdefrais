@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Notes de frais</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #f7f5f0;
+    color: #1a1a1a;
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; letter-spacing: -0.01em; }
+
+.login-screen {
+min-height: 100vh;
+display: flex; align-items: center; justify-content: center;
+background: linear-gradient(135deg, #f4f1ea 0%, #e8e2d3 100%);
+padding: 20px;
+}
+.login-card {
+background: #fff; padding: 36px 28px;
+max-width: 420px; width: 100%;
+box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+border-radius: 4px; text-align: center;
+}
+.login-card h1 { font-size: 28px; margin: 16px 0 8px; }
+.login-card .subtitle { color: #555; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+.disclaimer { font-size: 11px; color: #888; margin-top: 20px; line-height: 1.5; }
+
+input, select, button { font-family: inherit; font-size: 15px; }
+input[type=text], input[type=number], input[type=date], input[type=time], select {
+width: 100%; padding: 11px 13px;
+border: 1px solid #d4cfc0; border-radius: 2px;
+background: #fff; font-size: 15px;
+}
+input[type=file] {
+width: 100%; padding: 10px;
+border: 1px dashed #b8b09a; border-radius: 2px;
+background: #fafaf5; font-size: 13px;
+}
+label {
+display: flex; align-items: center; gap: 4px;
+font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 500;
+}
+
+.btn {
+display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+padding: 11px 18px; font-size: 14px;
+border: none; border-radius: 2px; cursor: pointer;
+font-weight: 500; letter-spacing: 0.01em;
+transition: opacity 0.15s;
+}
+.btn:active { opacity: 0.7; }
+.btn-primary { background: #1a1a1a; color: #fff; }
+.btn-secondary { background: #fff; color: #1a1a1a; border: 1px solid #1a1a1a; }
+.btn-ghost { background: transparent; color: #666; border: 1px solid #ccc; }
+.btn-full { width: 100%; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.app { display: none; }
+header.app-header {
+background: #fff;
+padding: 12px 16px;
+display: flex; justify-content: space-between; align-items: center;
+border-bottom: 1px solid #e5e0d5;
+position: sticky; top: 0; z-index: 10;
+}
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-family: Georgia, serif; }
+.user-info { display: flex; align-items: center; gap: 8px; color: #555; font-size: 13px; }
+.icon-btn {
+background: none; border: none; padding: 6px; cursor: pointer;
+color: #666; display: inline-flex; align-items: center; font-size: 16px;
+}
+main { max-width: 900px; margin: 0 auto; padding: 16px 12px 60px; }
+
+.card {
+background: #fff; padding: 18px;
+margin-bottom: 14px;
+border: 1px solid #e5e0d5; border-radius: 4px;
+}
+.section-title {
+font-size: 12px; font-weight: 600; text-transform: uppercase;
+letter-spacing: 0.08em; color: #555; margin: 0 0 12px;
+}
+.form-grid {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+gap: 12px;
+}
+.full-row { grid-column: 1 / -1; }
+
+.summary-grid {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+gap: 8px;
+margin-bottom: 14px;
+}
+.summary-card {
+background: #fff; padding: 12px;
+border: 1px solid #e5e0d5;
+border-top: 3px solid;
+border-radius: 4px;
+}
+.summary-icon { font-size: 18px; }
+.summary-label {
+font-size: 10px; color: #777; text-transform: uppercase;
+letter-spacing: 0.05em; margin-top: 6px;
+}
+.summary-amount {
+font-size: 20px; font-weight: 700;
+font-family: Georgia, serif; margin-top: 2px;
+letter-spacing: -0.02em;
+}
+.summary-count { font-size: 10px; color: #999; }
+.total-card {
+background: #1a1a1a; border-color: #1a1a1a !important;
+border-top-color: #1a1a1a !important; color: #fff;
+}
+.total-card .summary-label { color: #ddd; }
+.total-card .summary-count { color: #aaa; }
+
+.action-row {
+display: flex; gap: 8px; flex-wrap: wrap;
+margin-bottom: 14px;
+}
+.action-row .btn { flex: 1; min-width: 140px; }
+
+.error, .info {
+padding: 10px 14px; border-radius: 2px;
+margin-bottom: 12px; font-size: 13px;
+display: none;
+}
+.error { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+.info { background: #eff6ff; color: #1e40af; border: 1px solid #93c5fd; }
+.error.show, .info.show { display: block; }
+
+.photo-preview { margin-top: 10px; text-align: center; }
+.photo-preview img {
+max-width: 100%; max-height: 220px;
+border-radius: 2px; border: 1px solid #e5e0d5;
+}
+
+.ocr-status {
+margin-top: 8px; padding: 10px;
+background: #fef9e7; border: 1px solid #f6d860;
+border-radius: 2px; font-size: 13px; color: #6b5510;
+display: none;
+}
+.ocr-status.show { display: block; }
+.ocr-status.success { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; }
+
+.progress-bar {
+height: 4px; background: #f0e8d0; border-radius: 2px; margin-top: 6px;
+overflow: hidden;
+}
+.progress-bar-fill {
+height: 100%; background: #d97706;
+width: 0%; transition: width 0.3s;
+}
+
+.expense-list { display: flex; flex-direction: column; gap: 6px; }
+.expense-row {
+display: flex; align-items: center; gap: 10px;
+background: #fff; padding: 10px;
+border: 1px solid #e5e0d5; border-radius: 4px;
+}
+.cat-badge {
+width: 32px; height: 32px; border-radius: 50%;
+display: flex; align-items: center; justify-content: center;
+flex-shrink: 0; color: #fff; font-size: 16px;
+}
+.thumb {
+width: 44px; height: 44px; object-fit: cover;
+border-radius: 2px; border: 1px solid #e5e0d5; flex-shrink: 0;
+}
+.expense-info { flex: 1; min-width: 0; }
+.expense-date { font-size: 13px; font-weight: 600; }
+.expense-desc {
+font-size: 12px; color: #666;
+overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.expense-amount {
+font-weight: 700; font-family: Georgia, serif;
+font-size: 16px; flex-shrink: 0;
+}
+.delete-btn {
+background: none; border: none; color: #999;
+cursor: pointer; padding: 6px; flex-shrink: 0; font-size: 14px;
+}
+.empty {
+background: #fff; padding: 30px; text-align: center;
+color: #888; border: 1px dashed #d4cfc0; border-radius: 4px;
+font-size: 14px;
+}
+footer.app-footer {
+margin-top: 30px; padding: 20px 0;
+border-top: 1px solid #e5e0d5;
+font-size: 11px; color: #888; text-align: center; line-height: 1.6;
+}
+.hidden { display: none !important; }
+</style>
+
+</head>
+<body>
+
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div style="font-size: 48px;">🧾</div>
+    <h1>Notes de frais</h1>
+    <p class="subtitle">
+      Outil personnel de suivi des dépenses professionnelles avec OCR.<br>
+      Vos données restent dans ce navigateur.
+    </p>
+    <input type="text" id="login-input" placeholder="Votre prénom et nom" autofocus>
+    <div style="height: 10px;"></div>
+    <button class="btn btn-primary btn-full" id="login-btn">Accéder à mon espace</button>
+    <p class="disclaimer">
+      ⚠️ Cet outil n'a pas de valeur probante légale. Conservez les justificatifs originaux.
+    </p>
+  </div>
+</div>
+
+<div id="app" class="app">
+  <header class="app-header">
+    <div class="brand">🧾 <span>Notes de frais</span></div>
+    <div class="user-info">
+      <span id="user-display"></span>
+      <button class="icon-btn" id="logout-btn" title="Changer d'utilisateur">↩</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="card">
+      <div class="section-title">Informations de la mission</div>
+      <div class="form-grid">
+        <div>
+          <label>Objet (formation, déplacement…)</label>
+          <input type="text" id="mission-objet" placeholder="Ex : Formation Module 3 — Lyon">
+        </div>
+        <div>
+          <label>Période</label>
+          <input type="text" id="mission-periode" placeholder="Ex : 12-14 mai 2026">
+        </div>
+      </div>
+    </div>
+
+```
+<div class="summary-grid" id="summary-grid"></div>
+
+<div class="error" id="error-box"></div>
+<div class="info" id="info-box"></div>
+
+<div class="action-row">
+  <button class="btn btn-primary" id="add-btn">+ Nouvelle dépense</button>
+  <button class="btn btn-secondary" id="export-btn">⬇ Exporter en PDF</button>
+</div>
+
+<div class="card hidden" id="form-card">
+  <div class="section-title">Nouvelle dépense</div>
+
+  <div class="form-grid">
+    <div class="full-row">
+      <label>📷 Photo du justificatif (l'OCR essaiera d'extraire date, heure et montant)</label>
+      <input type="file" id="form-photo" accept="image/*" capture="environment">
+      <div class="photo-preview hidden" id="photo-preview">
+        <img id="preview-img" alt="Aperçu">
+      </div>
+      <div class="ocr-status" id="ocr-status">
+        <div id="ocr-message">Lecture du ticket en cours…</div>
+        <div class="progress-bar"><div class="progress-bar-fill" id="ocr-progress"></div></div>
+      </div>
+    </div>
+    <div>
+      <label>📅 Date</label>
+      <input type="date" id="form-date">
+    </div>
+    <div>
+      <label>🕐 Heure (sert à classer le repas)</label>
+      <input type="time" id="form-time">
+    </div>
+    <div>
+      <label>Catégorie</label>
+      <select id="form-category">
+        <option value="taxi">🚖 Transport / Taxi</option>
+        <option value="petit_dej">☕ Petit-déjeuner</option>
+        <option value="dejeuner">🍽 Déjeuner</option>
+        <option value="diner">🌙 Dîner</option>
+        <option value="repas">🍴 Repas (autre)</option>
+        <option value="logement">🏨 Logement</option>
+        <option value="autre">📦 Autre</option>
+      </select>
+    </div>
+    <div>
+      <label>€ Montant TTC</label>
+      <input type="number" step="0.01" min="0" id="form-amount" placeholder="0,00" inputmode="decimal">
+    </div>
+    <div class="full-row">
+      <label>Description (optionnel)</label>
+      <input type="text" id="form-description" placeholder="Ex : Taxi gare → hôtel">
+    </div>
+  </div>
+  <div style="display: flex; gap: 8px; margin-top: 16px;">
+    <button class="btn btn-primary" id="save-btn">Ajouter</button>
+    <button class="btn btn-ghost" id="cancel-btn">Annuler</button>
+  </div>
+</div>
+
+<div class="section-title" style="margin-top: 18px;">📋 Détail des dépenses (<span id="expense-count">0</span>)</div>
+<div id="expense-list-container"></div>
+
+<footer class="app-footer">
+  Cet outil n'a pas de valeur probante légale.<br>
+  Conservez les justificatifs originaux pour votre RH.
+</footer>
+```
+
+  </main>
+</div>
+
+<script>
+'use strict';
+
+// ============== Configuration ==============
+const CATEGORIES = {
+  taxi:      { label: 'Transport / Taxi', icon: '🚖', color: '#d97706' },
+  petit_dej: { label: 'Petit-déjeuner',   icon: '☕', color: '#ca8a04' },
+  dejeuner:  { label: 'Déjeuner',         icon: '🍽',  color: '#dc2626' },
+  diner:     { label: 'Dîner',            icon: '🌙', color: '#7c3aed' },
+  repas:     { label: 'Repas',            icon: '🍴', color: '#e11d48' },
+  logement:  { label: 'Logement',         icon: '🏨', color: '#2563eb' },
+  autre:     { label: 'Autre',            icon: '📦', color: '#6b7280' },
+};
+
+// Order to display in summary (skip "repas" if empty, etc)
+const SUMMARY_ORDER = ['taxi', 'petit_dej', 'dejeuner', 'diner', 'repas', 'logement', 'autre'];
+
+let currentUser = null;
+let expenses = [];
+let missionInfo = { objet: '', periode: '' };
+let formPhoto = null;
+
+// ============== Storage ==============
+function storageGet(key) {
+  try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+function storageSet(key, value) {
+  try { localStorage.setItem(key, value); return true; }
+  catch (e) {
+    showError("Stockage saturé. Exportez le PDF puis supprimez d'anciennes dépenses.");
+    return false;
+  }
+}
+function storageDel(key) { try { localStorage.removeItem(key); } catch (e) {} }
+
+function loadUserData(user) {
+  const raw = storageGet('expenses:' + user);
+  if (raw) {
+    try {
+      const data = JSON.parse(raw);
+      expenses = data.expenses || [];
+      missionInfo = data.missionInfo || { objet: '', periode: '' };
+    } catch (e) {
+      expenses = []; missionInfo = { objet: '', periode: '' };
+    }
+  } else {
+    expenses = []; missionInfo = { objet: '', periode: '' };
+  }
+}
+function saveUserData() {
+  if (!currentUser) return;
+  storageSet('expenses:' + currentUser, JSON.stringify({ expenses, missionInfo }));
+}
+
+// ============== UI helpers ==============
+function showError(msg) {
+  const box = document.getElementById('error-box');
+  box.textContent = '⚠ ' + msg;
+  box.classList.add('show');
+  setTimeout(() => box.classList.remove('show'), 5000);
+}
+function showInfo(msg) {
+  const box = document.getElementById('info-box');
+  box.textContent = 'ℹ ' + msg;
+  box.classList.add('show');
+  setTimeout(() => box.classList.remove('show'), 4000);
+}
+
+function login() {
+  const input = document.getElementById('login-input');
+  const name = input.value.trim();
+  if (!name) return;
+  const userId = name.toLowerCase().replace(/[^a-z0-9]/gi, '_');
+  currentUser = userId;
+  storageSet('current_user', userId);
+  storageSet('displayname:' + userId, name);
+  loadUserData(userId);
+  showApp();
+}
+
+function logout() {
+  storageDel('current_user');
+  currentUser = null;
+  expenses = [];
+  missionInfo = { objet: '', periode: '' };
+  document.getElementById('login-input').value = '';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  const display = storageGet('displayname:' + currentUser) || currentUser;
+  document.getElementById('user-display').textContent = '👤 ' + display;
+  document.getElementById('mission-objet').value = missionInfo.objet || '';
+  document.getElementById('mission-periode').value = missionInfo.periode || '';
+  document.getElementById('form-date').value = new Date().toISOString().split('T')[0];
+  renderSummary();
+  renderExpenseList();
+}
+
+function renderSummary() {
+  const grid = document.getElementById('summary-grid');
+  grid.innerHTML = '';
+  let grandTotal = 0;
+  SUMMARY_ORDER.forEach(catId => {
+    const cat = CATEGORIES[catId];
+    const items = expenses.filter(e => e.category === catId);
+    if (items.length === 0 && catId !== 'taxi' && catId !== 'logement') return; // n'affiche pas les repas vides
+    const total = items.reduce((s, e) => s + e.amount, 0);
+    grandTotal += total;
+    const card = document.createElement('div');
+    card.className = 'summary-card';
+    card.style.borderTopColor = cat.color;
+    card.innerHTML = `
+      <div class="summary-icon" style="color: ${cat.color}">${cat.icon}</div>
+      <div class="summary-label">${cat.label}</div>
+      <div class="summary-amount">${total.toFixed(2)} €</div>
+      <div class="summary-count">${items.length} dépense${items.length > 1 ? 's' : ''}</div>
+    `;
+    grid.appendChild(card);
+  });
+  // Toujours recalculer le total complet
+  grandTotal = expenses.reduce((s, e) => s + e.amount, 0);
+  const totalCard = document.createElement('div');
+  totalCard.className = 'summary-card total-card';
+  totalCard.innerHTML = `
+    <div class="summary-icon">€</div>
+    <div class="summary-label">Total général</div>
+    <div class="summary-amount">${grandTotal.toFixed(2)} €</div>
+    <div class="summary-count">${expenses.length} ligne${expenses.length > 1 ? 's' : ''}</div>
+  `;
+  grid.appendChild(totalCard);
+}
+
+function renderExpenseList() {
+  const container = document.getElementById('expense-list-container');
+  document.getElementById('expense-count').textContent = expenses.length;
+  if (expenses.length === 0) {
+    container.innerHTML = `<div class="empty">Aucune dépense pour l'instant.<br>Cliquez sur « Nouvelle dépense » pour commencer.</div>`;
+    return;
+  }
+  const sorted = [...expenses].sort((a, b) => {
+    const cmp = a.date.localeCompare(b.date);
+    if (cmp !== 0) return cmp;
+    return (a.time || '').localeCompare(b.time || '');
+  });
+  const list = document.createElement('div');
+  list.className = 'expense-list';
+  sorted.forEach(exp => {
+    const cat = CATEGORIES[exp.category] || CATEGORIES.autre;
+    const row = document.createElement('div');
+    row.className = 'expense-row';
+    const timeStr = exp.time ? ' • ' + exp.time : '';
+    row.innerHTML = `
+      <div class="cat-badge" style="background: ${cat.color}">${cat.icon}</div>
+      <img class="thumb" src="${exp.photo}" alt="justif">
+      <div class="expense-info">
+        <div class="expense-date">${formatDate(exp.date)}${timeStr}</div>
+        <div class="expense-desc">${escapeHtml(cat.label)}${exp.description ? ' — ' + escapeHtml(exp.description) : ''}</div>
+      </div>
+      <div class="expense-amount">${exp.amount.toFixed(2)} €</div>
+      <button class="delete-btn" data-id="${exp.id}" title="Supprimer">🗑</button>
+    `;
+    list.appendChild(row);
+  });
+  container.innerHTML = '';
+  container.appendChild(list);
+  list.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => deleteExpense(btn.dataset.id));
+  });
+}
+
+function formatDate(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  return d.toLocaleDateString('fr-FR');
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function deleteExpense(id) {
+  if (!confirm('Supprimer cette dépense ?')) return;
+  expenses = expenses.filter(e => e.id !== id);
+  saveUserData();
+  renderSummary();
+  renderExpenseList();
+}
+
+function showForm(show) {
+  const card = document.getElementById('form-card');
+  card.classList.toggle('hidden', !show);
+  if (show) {
+    document.getElementById('form-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('form-time').value = '';
+    document.getElementById('form-amount').value = '';
+    document.getElementById('form-description').value = '';
+    document.getElementById('form-category').value = 'taxi';
+    document.getElementById('form-photo').value = '';
+    document.getElementById('photo-preview').classList.add('hidden');
+    document.getElementById('ocr-status').classList.remove('show', 'success');
+    formPhoto = null;
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+// ============== Photo + OCR ==============
+function handlePhoto(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 1600;
+      let w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = h * maxDim / w; w = maxDim; }
+        else { w = w * maxDim / h; h = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      formPhoto = canvas.toDataURL('image/jpeg', 0.85);
+      document.getElementById('preview-img').src = formPhoto;
+      document.getElementById('photo-preview').classList.remove('hidden');
+      // Lance l'OCR avec une version potentiellement plus petite pour la vitesse
+      runOCR(canvas);
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function runOCR(canvas) {
+  const status = document.getElementById('ocr-status');
+  const message = document.getElementById('ocr-message');
+  const progress = document.getElementById('ocr-progress');
+  status.classList.remove('success');
+  status.classList.add('show');
+  message.textContent = 'Analyse du ticket en cours… (peut prendre 10-20 s la 1ʳᵉ fois)';
+  progress.style.width = '0%';
+
+  try {
+    const result = await Tesseract.recognize(canvas, 'fra', {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          progress.style.width = Math.round(m.progress * 100) + '%';
+        } else if (m.status === 'loading tesseract core' || m.status === 'initializing tesseract') {
+          message.textContent = 'Chargement du moteur OCR…';
+        } else if (m.status === 'loading language traineddata') {
+          message.textContent = 'Chargement de la langue française…';
+        } else if (m.status === 'initialized api') {
+          message.textContent = 'Lecture du ticket…';
+        }
+      }
+    });
+
+    const text = result.data.text || '';
+    const parsed = parseReceiptText(text);
+    applyParsedData(parsed);
+
+    const found = [];
+    if (parsed.amount) found.push(`montant ${parsed.amount.toFixed(2)} €`);
+    if (parsed.date) found.push('date');
+    if (parsed.time) found.push('heure ' + parsed.time);
+
+    if (found.length > 0) {
+      status.classList.add('success');
+      message.textContent = '✓ Détecté : ' + found.join(', ') + '. Vérifiez et corrigez si besoin.';
+    } else {
+      message.textContent = '⚠ Rien de fiable détecté. Saisissez les champs manuellement.';
+    }
+  } catch (err) {
+    message.textContent = '⚠ OCR indisponible : ' + err.message + '. Saisissez manuellement.';
+  }
+}
+
+// ============== Parsing du texte OCR ==============
+function parseReceiptText(text) {
+  const result = { amount: null, date: null, time: null };
+  if (!text) return result;
+
+  // ----- Montant -----
+  // Cherche les motifs typiques : "TOTAL", "TOTAL TTC", "MONTANT", "A PAYER", "NET A PAYER"
+  // suivis d'un nombre. À défaut, prend le plus gros nombre crédible.
+  const amountRegex = /(\d+[\s.,]\d{2})\s*€?|€\s*(\d+[\s.,]\d{2})/g;
+  const lines = text.split(/\r?\n/);
+  let bestAmount = null;
+  let bestPriority = -1;
+
+  // Mots-clés priorisés (plus la priorité est haute, plus on fait confiance)
+  const totalKeywords = [
+    { regex: /\bnet\s*[àa]\s*payer\b/i, priority: 5 },
+    { regex: /\btotal\s*ttc\b/i,        priority: 5 },
+    { regex: /\bmontant\s*ttc\b/i,      priority: 5 },
+    { regex: /\b[àa]\s*payer\b/i,       priority: 4 },
+    { regex: /\btotal\b/i,              priority: 3 },
+    { regex: /\bmontant\b/i,            priority: 2 },
+  ];
+
+  // Parcours ligne par ligne en priorisant les lignes "TOTAL"
+  for (const line of lines) {
+    let linePriority = 0;
+    for (const kw of totalKeywords) {
+      if (kw.regex.test(line) && kw.priority > linePriority) {
+        linePriority = kw.priority;
+      }
+    }
+    // Extrait tous les nombres décimaux de la ligne
+    const matches = [...line.matchAll(/(\d{1,4})[\s.,](\d{2})\b/g)];
+    for (const m of matches) {
+      const value = parseFloat(m[1] + '.' + m[2]);
+      if (value > 0 && value < 10000) {
+        if (linePriority > bestPriority || (linePriority === bestPriority && value > (bestAmount || 0))) {
+          bestAmount = value;
+          bestPriority = linePriority;
+        }
+      }
+    }
+  }
+
+  // Si rien de prioritaire trouvé, prend le plus gros montant raisonnable du document
+  if (bestAmount === null) {
+    const allMatches = [...text.matchAll(/(\d{1,4})[\s.,](\d{2})\b/g)];
+    let max = 0;
+    for (const m of allMatches) {
+      const value = parseFloat(m[1] + '.' + m[2]);
+      if (value > max && value < 10000) max = value;
+    }
+    if (max > 0) bestAmount = max;
+  }
+  result.amount = bestAmount;
+
+  // ----- Date -----
+  // Formats supportés : JJ/MM/AAAA, JJ-MM-AAAA, JJ.MM.AAAA, JJ/MM/AA
+  const dateRegex = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/;
+  const dateMatch = text.match(dateRegex);
+  if (dateMatch) {
+    let [_, dd, mm, yy] = dateMatch;
+    dd = dd.padStart(2, '0');
+    mm = mm.padStart(2, '0');
+    if (yy.length === 2) {
+      const yearNum = parseInt(yy);
+      yy = (yearNum > 70 ? '19' : '20') + yy;
+    }
+    // Validation grossière
+    const d = parseInt(dd), m = parseInt(mm), y = parseInt(yy);
+    if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 2020 && y <= 2035) {
+      result.date = `${yy}-${mm}-${dd}`;
+    }
+  }
+
+  // ----- Heure -----
+  // Formats : HH:MM, HHhMM, HH h MM
+  const timeRegex = /\b([01]?\d|2[0-3])\s*[:hH]\s*([0-5]\d)\b/;
+  const timeMatch = text.match(timeRegex);
+  if (timeMatch) {
+    const hh = timeMatch[1].padStart(2, '0');
+    const mm = timeMatch[2].padStart(2, '0');
+    result.time = `${hh}:${mm}`;
+  }
+
+  return result;
+}
+
+// ============== Application des données détectées + classement repas ==============
+function categorizeMealByTime(timeStr) {
+  if (!timeStr) return null;
+  const [h, m] = timeStr.split(':').map(Number);
+  const minutes = h * 60 + m;
+  // 6h00 - 10h30 → petit-déjeuner
+  if (minutes >= 360 && minutes <= 630) return 'petit_dej';
+  // 11h00 - 15h00 → déjeuner
+  if (minutes >= 660 && minutes <= 900) return 'dejeuner';
+  // 18h30 - 23h00 → dîner
+  if (minutes >= 1110 && minutes <= 1380) return 'diner';
+  // entre les deux : repas générique
+  return 'repas';
+}
+
+function applyParsedData(parsed) {
+  if (parsed.amount) {
+    document.getElementById('form-amount').value = parsed.amount.toFixed(2);
+  }
+  if (parsed.date) {
+    document.getElementById('form-date').value = parsed.date;
+  }
+  if (parsed.time) {
+    document.getElementById('form-time').value = parsed.time;
+    // Si une heure est détectée, suggère une catégorie repas
+    // (l'utilisateur peut toujours changer pour taxi/logement/autre)
+    const suggestedCat = categorizeMealByTime(parsed.time);
+    const currentCat = document.getElementById('form-category').value;
+    // Ne change que si on est encore sur la valeur par défaut
+    if (suggestedCat && currentCat === 'taxi') {
+      document.getElementById('form-category').value = suggestedCat;
+    }
+  }
+}
+
+function saveExpense() {
+  const date = document.getElementById('form-date').value;
+  const time = document.getElementById('form-time').value;
+  const category = document.getElementById('form-category').value;
+  const amount = parseFloat(document.getElementById('form-amount').value);
+  const description = document.getElementById('form-description').value.trim();
+  if (!date) { showError('Date requise'); return; }
+  if (isNaN(amount) || amount <= 0) { showError('Montant requis et > 0'); return; }
+  if (!formPhoto) { showError('Photo du justificatif obligatoire'); return; }
+  const newExp = {
+    id: Date.now().toString() + Math.random().toString(36).slice(2, 7),
+    date, time, category, amount, description, photo: formPhoto,
+  };
+  expenses.push(newExp);
+  saveUserData();
+  showForm(false);
+  renderSummary();
+  renderExpenseList();
+  showInfo('Dépense ajoutée');
+}
+
+// ============== PDF ==============
+async function generatePDF() {
+  if (expenses.length === 0) {
+    showError('Aucune dépense à exporter');
+    return;
+  }
+  const btn = document.getElementById('export-btn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Génération…';
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const displayName = storageGet('displayname:' + currentUser) || currentUser;
+    const pageW = 210, pageH = 297, margin = 15;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text('NOTE DE FRAIS', margin, 20);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text('Émise le ' + new Date().toLocaleDateString('fr-FR'), pageW - margin, 20, { align: 'right' });
+
+    doc.setTextColor(0);
+    doc.setFontSize(11);
+    let y = 35;
+    doc.setFont('helvetica', 'bold'); doc.text('Bénéficiaire :', margin, y);
+    doc.setFont('helvetica', 'normal'); doc.text(displayName, margin + 35, y);
+    y += 6;
+    if (missionInfo.objet) {
+      doc.setFont('helvetica', 'bold'); doc.text('Objet :', margin, y);
+      doc.setFont('helvetica', 'normal'); doc.text(missionInfo.objet, margin + 35, y);
+      y += 6;
+    }
+    if (missionInfo.periode) {
+      doc.setFont('helvetica', 'bold'); doc.text('Période :', margin, y);
+      doc.setFont('helvetica', 'normal'); doc.text(missionInfo.periode, margin + 35, y);
+      y += 6;
+    }
+    y += 4;
+
+    // Table header
+    doc.setFillColor(30, 30, 30);
+    doc.rect(margin, y, pageW - 2 * margin, 8, 'F');
+    doc.setTextColor(255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('N°', margin + 2, y + 5.5);
+    doc.text('DATE', margin + 12, y + 5.5);
+    doc.text('HEURE', margin + 32, y + 5.5);
+    doc.text('CATÉGORIE', margin + 47, y + 5.5);
+    doc.text('DESCRIPTION', margin + 85, y + 5.5);
+    doc.text('MONTANT TTC', pageW - margin - 2, y + 5.5, { align: 'right' });
+    y += 8;
+
+    doc.setTextColor(0);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+
+    const sorted = [...expenses].sort((a, b) => {
+      const cmp = a.date.localeCompare(b.date);
+      if (cmp !== 0) return cmp;
+      return (a.time || '').localeCompare(b.time || '');
+    });
+    const totalsByCategory = {};
+    SUMMARY_ORDER.forEach(c => totalsByCategory[c] = 0);
+
+    sorted.forEach((exp, idx) => {
+      if (y > pageH - 30) { doc.addPage(); y = 20; }
+      if (idx % 2 === 0) {
+        doc.setFillColor(248, 248, 248);
+        doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
+      }
+      const cat = CATEGORIES[exp.category] || CATEGORIES.autre;
+      totalsByCategory[exp.category] = (totalsByCategory[exp.category] || 0) + exp.amount;
+      doc.text(String(idx + 1), margin + 2, y + 5);
+      doc.text(formatDate(exp.date), margin + 12, y + 5);
+      doc.text(exp.time || '-', margin + 32, y + 5);
+      doc.text(cat.label, margin + 47, y + 5);
+      const desc = exp.description || '-';
+      const truncDesc = desc.length > 32 ? desc.slice(0, 30) + '...' : desc;
+      doc.text(truncDesc, margin + 85, y + 5);
+      doc.text(exp.amount.toFixed(2) + ' €', pageW - margin - 2, y + 5, { align: 'right' });
+      y += 7;
+    });
+
+    y += 4;
+    doc.setDrawColor(30, 30, 30);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageW - margin, y);
+    y += 6;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('TOTAUX PAR CATÉGORIE', margin, y);
+    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    let grandTotal = 0;
+    SUMMARY_ORDER.forEach(catId => {
+      const v = totalsByCategory[catId] || 0;
+      grandTotal += v;
+      if (v > 0) {
+        if (y > pageH - 25) { doc.addPage(); y = 20; }
+        doc.text(CATEGORIES[catId].label, margin + 5, y);
+        doc.text(v.toFixed(2) + ' €', margin + 80, y, { align: 'right' });
+        y += 5;
+      }
+    });
+    y += 2;
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, margin + 85, y);
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('TOTAL GÉNÉRAL', margin + 5, y);
+    doc.text(grandTotal.toFixed(2) + ' €', margin + 80, y, { align: 'right' });
+    y += 12;
+
+    if (y > pageH - 40) { doc.addPage(); y = 20; }
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(80);
+    doc.text("Je certifie sur l'honneur l'exactitude des dépenses ci-dessus et atteste avoir engagé", margin, y);
+    y += 4;
+    doc.text('personnellement ces frais dans le cadre de mes activités professionnelles.', margin, y);
+    y += 10;
+    doc.text('Signature :', margin, y);
+    doc.text('Date :', pageW - margin - 60, y);
+
+    // Annexe : justificatifs
+    sorted.forEach((exp, idx) => {
+      doc.addPage();
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(0);
+      const cat = CATEGORIES[exp.category] || CATEGORIES.autre;
+      doc.text('Justificatif n°' + (idx + 1) + ' — ' + cat.label, margin, 20);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(80);
+      const meta = formatDate(exp.date) + (exp.time ? ' à ' + exp.time : '') +
+                   '   •   ' + exp.amount.toFixed(2) + ' €' +
+                   (exp.description ? '   •   ' + exp.description : '');
+      doc.text(meta, margin, 27);
+      try {
+        doc.addImage(exp.photo, 'JPEG', margin, 35, pageW - 2 * margin, pageH - 50, undefined, 'MEDIUM');
+      } catch (err) {
+        doc.setTextColor(200, 0, 0);
+        doc.text("Erreur d'insertion de l'image", margin, 50);
+      }
+    });
+
+    const filename = 'Note_de_frais_' + displayName.replace(/\s+/g, '_') + '_' + new Date().toISOString().split('T')[0] + '.pdf';
+    doc.save(filename);
+  } catch (err) {
+    showError('Erreur génération PDF : ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+// ============== Events ==============
+document.getElementById('login-btn').addEventListener('click', login);
+document.getElementById('login-input').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+document.getElementById('logout-btn').addEventListener('click', logout);
+document.getElementById('add-btn').addEventListener('click', () => showForm(true));
+document.getElementById('cancel-btn').addEventListener('click', () => showForm(false));
+document.getElementById('save-btn').addEventListener('click', saveExpense);
+document.getElementById('form-photo').addEventListener('change', handlePhoto);
+document.getElementById('export-btn').addEventListener('click', generatePDF);
+document.getElementById('mission-objet').addEventListener('input', e => { missionInfo.objet = e.target.value; saveUserData(); });
+document.getElementById('mission-periode').addEventListener('input', e => { missionInfo.periode = e.target.value; saveUserData(); });
+
+// Quand on change l'heure manuellement, propose de reclasser si on est sur "repas/petit_dej/dejeuner/diner"
+document.getElementById('form-time').addEventListener('change', e => {
+  const time = e.target.value;
+  if (!time) return;
+  const currentCat = document.getElementById('form-category').value;
+  const mealCats = ['repas', 'petit_dej', 'dejeuner', 'diner'];
+  if (mealCats.includes(currentCat)) {
+    const suggested = categorizeMealByTime(time);
+    if (suggested && suggested !== currentCat) {
+      document.getElementById('form-category').value = suggested;
+    }
+  }
+});
+
+// Init
+const savedUser = storageGet('current_user');
+if (savedUser) {
+  currentUser = savedUser;
+  loadUserData(savedUser);
+  showApp();
+}
+</script>
+
+</body>
+</html>
