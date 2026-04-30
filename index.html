@@ -272,8 +272,12 @@ font-size: 11px; color: #888; text-align: center; line-height: 1.6;
 
   <div class="form-grid">
     <div class="full-row">
-      <label>📷 Photo du justificatif (l'OCR essaiera d'extraire date, heure et montant)</label>
-      <input type="file" id="form-photo" accept="image/*" capture="environment">
+      <label>📷 Photo ou import du justificatif (l'OCR essaiera d'extraire date, heure et montant)</label>
+      <input type="file" id="form-photo" accept="image/*" style="display: none;">
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button type="button" class="btn btn-ghost" id="camera-btn" style="flex: 1; min-width: 120px;">📷 Prendre une photo</button>
+        <button type="button" class="btn btn-ghost" id="gallery-btn" style="flex: 1; min-width: 120px;">🖼 Depuis la galerie</button>
+      </div>
       <div class="photo-preview hidden" id="photo-preview">
         <img id="preview-img" alt="Aperçu">
       </div>
@@ -1023,6 +1027,19 @@ document.getElementById('add-btn').addEventListener('click', () => showForm(true
 document.getElementById('cancel-btn').addEventListener('click', () => showForm(false));
 document.getElementById('save-btn').addEventListener('click', saveExpense);
 document.getElementById('form-photo').addEventListener('change', handlePhoto);
+
+// Boutons photo / galerie : pilotent le même input mais l'attribut "capture"
+// décide si le navigateur ouvre l'appareil photo direct ou la pellicule.
+document.getElementById('camera-btn').addEventListener('click', () => {
+  const input = document.getElementById('form-photo');
+  input.setAttribute('capture', 'environment');
+  input.click();
+});
+document.getElementById('gallery-btn').addEventListener('click', () => {
+  const input = document.getElementById('form-photo');
+  input.removeAttribute('capture');
+  input.click();
+});
 document.getElementById('export-btn').addEventListener('click', generatePDF);
 document.getElementById('backup-btn').addEventListener('click', backupData);
 document.getElementById('restore-btn').addEventListener('click', triggerRestore);
