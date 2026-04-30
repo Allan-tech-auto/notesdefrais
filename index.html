@@ -7,6 +7,13 @@
 <title>Notes de frais</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  // Configuration du worker PDF.js (nécessaire pour le fonctionnement)
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+</script>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -272,11 +279,12 @@ font-size: 11px; color: #888; text-align: center; line-height: 1.6;
 
   <div class="form-grid">
     <div class="full-row">
-      <label>📷 Photo ou import du justificatif (l'OCR essaiera d'extraire date, heure et montant)</label>
-      <input type="file" id="form-photo" accept="image/*" style="display: none;">
+      <label>📷 Photo, image ou PDF du justificatif (l'OCR essaiera d'extraire les infos)</label>
+      <input type="file" id="form-photo" accept="image/*,application/pdf" style="display: none;">
       <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button type="button" class="btn btn-ghost" id="camera-btn" style="flex: 1; min-width: 120px;">📷 Prendre une photo</button>
-        <button type="button" class="btn btn-ghost" id="gallery-btn" style="flex: 1; min-width: 120px;">🖼 Depuis la galerie</button>
+        <button type="button" class="btn btn-ghost" id="camera-btn" style="flex: 1; min-width: 110px;">📷 Photo</button>
+        <button type="button" class="btn btn-ghost" id="gallery-btn" style="flex: 1; min-width: 110px;">🖼 Galerie</button>
+        <button type="button" class="btn btn-ghost" id="pdf-btn" style="flex: 1; min-width: 110px;">📄 PDF</button>
       </div>
       <div class="photo-preview hidden" id="photo-preview">
         <img id="preview-img" alt="Aperçu">
@@ -297,7 +305,10 @@ font-size: 11px; color: #888; text-align: center; line-height: 1.6;
     <div>
       <label>Catégorie</label>
       <select id="form-category">
-        <option value="taxi">🚖 Transport / Taxi</option>
+        <option value="taxi">🚖 Taxi / VTC</option>
+        <option value="bus">🚌 Bus</option>
+        <option value="metro">🚇 Métro</option>
+        <option value="train">🚆 Train</option>
         <option value="petit_dej">☕ Petit-déjeuner</option>
         <option value="dejeuner">🍽 Déjeuner</option>
         <option value="diner">🌙 Dîner</option>
@@ -338,7 +349,10 @@ font-size: 11px; color: #888; text-align: center; line-height: 1.6;
 
 // ============== Configuration ==============
 const CATEGORIES = {
-  taxi:      { label: 'Transport / Taxi', icon: '🚖', color: '#d97706' },
+  taxi:      { label: 'Taxi / VTC',       icon: '🚖', color: '#d97706' },
+  bus:       { label: 'Bus',              icon: '🚌', color: '#0891b2' },
+  metro:     { label: 'Métro',            icon: '🚇', color: '#0e7490' },
+  train:     { label: 'Train',            icon: '🚆', color: '#0369a1' },
   petit_dej: { label: 'Petit-déjeuner',   icon: '☕', color: '#ca8a04' },
   dejeuner:  { label: 'Déjeuner',         icon: '🍽',  color: '#dc2626' },
   diner:     { label: 'Dîner',            icon: '🌙', color: '#7c3aed' },
@@ -348,7 +362,7 @@ const CATEGORIES = {
 };
 
 // Order to display in summary (skip "repas" if empty, etc)
-const SUMMARY_ORDER = ['taxi', 'petit_dej', 'dejeuner', 'diner', 'repas', 'logement', 'autre'];
+const SUMMARY_ORDER = ['taxi', 'bus', 'metro', 'train', 'petit_dej', 'dejeuner', 'diner', 'repas', 'logement', 'autre'];
 
 let currentUser = null;
 let expenses = [];
@@ -542,10 +556,19 @@ function showForm(show) {
   }
 }
 
-// ============== Photo + OCR ==============
+// ============== Photo / PDF + OCR ==============
 function handlePhoto(e) {
   const file = e.target.files && e.target.files[0];
   if (!file) return;
+
+  if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+    handlePdfFile(file);
+  } else {
+    handleImageFile(file);
+  }
+}
+
+function handleImageFile(file) {
   const reader = new FileReader();
   reader.onload = (ev) => {
     const img = new Image();
@@ -563,12 +586,69 @@ function handlePhoto(e) {
       formPhoto = canvas.toDataURL('image/jpeg', 0.85);
       document.getElementById('preview-img').src = formPhoto;
       document.getElementById('photo-preview').classList.remove('hidden');
-      // Lance l'OCR avec une version potentiellement plus petite pour la vitesse
       runOCR(canvas);
     };
     img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+async function handlePdfFile(file) {
+  if (!window.pdfjsLib) {
+    showError('Lecteur PDF non disponible. Vérifiez votre connexion.');
+    return;
+  }
+  const status = document.getElementById('ocr-status');
+  const message = document.getElementById('ocr-message');
+  const progress = document.getElementById('ocr-progress');
+  status.classList.remove('success');
+  status.classList.add('show');
+  message.textContent = 'Lecture du PDF…';
+  progress.style.width = '20%';
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const page = await pdf.getPage(1);
+
+    // 1. Extraire le texte (rapide, fiable, c'est natif)
+    const textContent = await page.getTextContent();
+    const fullText = textContent.items.map(it => it.str).join('\n');
+    progress.style.width = '60%';
+
+    // 2. Convertir la page en image pour l'avoir dans le PDF final
+    const viewport = page.getViewport({ scale: 1.5 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    formPhoto = canvas.toDataURL('image/jpeg', 0.85);
+    document.getElementById('preview-img').src = formPhoto;
+    document.getElementById('photo-preview').classList.remove('hidden');
+    progress.style.width = '90%';
+
+    // 3. Parser
+    const parsed = parseReceiptText(fullText);
+    applyParsedData(parsed);
+    progress.style.width = '100%';
+
+    const found = [];
+    if (parsed.merchant) found.push('marchand : ' + parsed.merchant);
+    if (parsed.amount) found.push('montant ' + parsed.amount.toFixed(2) + ' €');
+    if (parsed.date) found.push('date');
+    if (parsed.time) found.push('heure ' + parsed.time);
+    if (parsed.transportHint) found.push('type ' + parsed.transportHint);
+
+    if (found.length > 0) {
+      status.classList.add('success');
+      message.textContent = '✓ PDF lu — ' + found.join(', ') + '. Vérifiez avant validation.';
+    } else {
+      message.textContent = '⚠ PDF lu mais aucune donnée fiable extraite. Saisissez manuellement.';
+    }
+  } catch (err) {
+    message.textContent = '⚠ Erreur PDF : ' + err.message + '. Saisissez manuellement.';
+  }
 }
 
 async function runOCR(canvas) {
@@ -600,9 +680,11 @@ async function runOCR(canvas) {
     applyParsedData(parsed);
 
     const found = [];
-    if (parsed.amount) found.push(`montant ${parsed.amount.toFixed(2)} €`);
+    if (parsed.merchant) found.push('marchand : ' + parsed.merchant);
+    if (parsed.amount) found.push('montant ' + parsed.amount.toFixed(2) + ' €');
     if (parsed.date) found.push('date');
     if (parsed.time) found.push('heure ' + parsed.time);
+    if (parsed.transportHint) found.push('type ' + parsed.transportHint);
 
     if (found.length > 0) {
       status.classList.add('success');
@@ -617,28 +699,82 @@ async function runOCR(canvas) {
 
 // ============== Parsing du texte OCR ==============
 function parseReceiptText(text) {
-  const result = { amount: null, date: null, time: null };
+  const result = { amount: null, date: null, time: null, merchant: null, transportHint: null };
   if (!text) return result;
 
-  // ----- Montant -----
-  // Cherche les motifs typiques : "TOTAL", "TOTAL TTC", "MONTANT", "A PAYER", "NET A PAYER"
-  // suivis d'un nombre. À défaut, prend le plus gros nombre crédible.
-  const amountRegex = /(\d+[\s.,]\d{2})\s*€?|€\s*(\d+[\s.,]\d{2})/g;
-  const lines = text.split(/\r?\n/);
-  let bestAmount = null;
-  let bestPriority = -1;
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
 
-  // Mots-clés priorisés (plus la priorité est haute, plus on fait confiance)
+  // ----- Marchand : on cherche dans les premières lignes utiles -----
+  // Heuristique : on parcourt les ~10 premières lignes, on saute :
+  // - les lignes purement numériques / codes
+  // - les lignes très courtes (< 3 lettres)
+  // - les lignes contenant une adresse ou des codes SIRET/TVA
+  // - les lignes "RESTAURANT", "TICKET", etc. (mots génériques)
+  // On garde la 1ʳᵉ ligne avec au moins 3 lettres consécutives, qui n'est pas un descripteur.
+  const skipPatterns = [
+    /^\d+$/,                          // que des chiffres
+    /^[\d\s\-\.\/]+$/,                // chiffres + ponctuation
+    /\bsiret\b/i,
+    /\btva\b\s*(intra|fr|n°)/i,
+    /\b(rue|avenue|boulevard|bd|av|place|impasse)\b/i, // adresses
+    /\b\d{5}\s/,                      // code postal
+    /^t[ée]l/i,
+    /^https?:/i,
+    /^www\./i,
+    /^@/,
+    /^[\-=*_]+$/,                     // séparateurs
+  ];
+  const genericTerms = /^(restaurant|ticket|facture|recu|reçu|votre\s+(facture|reçu|ticket)|caisse|client)\s*$/i;
+
+  let merchantCandidate = null;
+  for (let i = 0; i < Math.min(lines.length, 12); i++) {
+    const line = lines[i];
+    if (line.length < 2) continue;
+    if (skipPatterns.some(rx => rx.test(line))) continue;
+    if (genericTerms.test(line)) continue;
+    // Doit contenir au moins 3 lettres
+    const letters = line.replace(/[^a-zA-ZÀ-ÿ]/g, '');
+    if (letters.length < 3) continue;
+    // Nettoyage : on enlève les caractères bizarres en début/fin
+    let cleaned = line.replace(/^[^a-zA-ZÀ-ÿ0-9]+|[^a-zA-ZÀ-ÿ0-9]+$/g, '').trim();
+    // On limite à 40 caractères
+    if (cleaned.length > 40) cleaned = cleaned.slice(0, 40).trim();
+    merchantCandidate = cleaned;
+    break;
+  }
+  if (merchantCandidate) result.merchant = merchantCandidate;
+
+  // ----- Détection transport (mots-clés) -----
+  const upperText = text.toUpperCase();
+  const transportKeywords = [
+    { regex: /\b(RATP|METRO|MÉTRO|SUBWAY)\b/, type: 'metro' },
+    { regex: /\b(SNCF|TGV|TER|INTERCIT[EÉ]S|OUIGO|THALYS|EUROSTAR|TRENITALIA)\b/, type: 'train' },
+    { regex: /\b(BUS|AUTOCAR|FLIXBUS|BLABLABUS|KEOLIS|STAR\b.*\b(BUS|RENNES)|TRANSDEV|ILEVIA)\b/, type: 'bus' },
+    { regex: /\bTRAM(WAY)?\b/, type: 'metro' }, // assimilable au métro pour l'urbain
+    { regex: /\b(UBER|BOLT|HEETCH|TAXI|VTC|G7|CAB|MARCEL|FREENOW)\b/, type: 'taxi' },
+    { regex: /\b(HOTEL|HÔTEL|IBIS|NOVOTEL|MERCURE|ACCOR|BOOKING|AIRBNB|B&B|FORMULE\s+1|CAMPANILE|KYRIAD)\b/, type: 'logement' },
+  ];
+  for (const kw of transportKeywords) {
+    if (kw.regex.test(upperText)) {
+      result.transportHint = kw.type;
+      break;
+    }
+  }
+
+  // ----- Montant -----
   const totalKeywords = [
     { regex: /\bnet\s*[àa]\s*payer\b/i, priority: 5 },
     { regex: /\btotal\s*ttc\b/i,        priority: 5 },
+    { regex: /\bmontant\s*total\s*ttc\b/i, priority: 5 },
     { regex: /\bmontant\s*ttc\b/i,      priority: 5 },
     { regex: /\b[àa]\s*payer\b/i,       priority: 4 },
     { regex: /\btotal\b/i,              priority: 3 },
     { regex: /\bmontant\b/i,            priority: 2 },
+    { regex: /\bprix\s*ttc\b/i,         priority: 4 },
   ];
+  let bestAmount = null;
+  let bestPriority = -1;
 
-  // Parcours ligne par ligne en priorisant les lignes "TOTAL"
   for (const line of lines) {
     let linePriority = 0;
     for (const kw of totalKeywords) {
@@ -646,7 +782,6 @@ function parseReceiptText(text) {
         linePriority = kw.priority;
       }
     }
-    // Extrait tous les nombres décimaux de la ligne
     const matches = [...line.matchAll(/(\d{1,4})[\s.,](\d{2})\b/g)];
     for (const m of matches) {
       const value = parseFloat(m[1] + '.' + m[2]);
@@ -659,7 +794,6 @@ function parseReceiptText(text) {
     }
   }
 
-  // Si rien de prioritaire trouvé, prend le plus gros montant raisonnable du document
   if (bestAmount === null) {
     const allMatches = [...text.matchAll(/(\d{1,4})[\s.,](\d{2})\b/g)];
     let max = 0;
@@ -672,7 +806,6 @@ function parseReceiptText(text) {
   result.amount = bestAmount;
 
   // ----- Date -----
-  // Formats supportés : JJ/MM/AAAA, JJ-MM-AAAA, JJ.MM.AAAA, JJ/MM/AA
   const dateRegex = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/;
   const dateMatch = text.match(dateRegex);
   if (dateMatch) {
@@ -683,7 +816,6 @@ function parseReceiptText(text) {
       const yearNum = parseInt(yy);
       yy = (yearNum > 70 ? '19' : '20') + yy;
     }
-    // Validation grossière
     const d = parseInt(dd), m = parseInt(mm), y = parseInt(yy);
     if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 2020 && y <= 2035) {
       result.date = `${yy}-${mm}-${dd}`;
@@ -691,7 +823,6 @@ function parseReceiptText(text) {
   }
 
   // ----- Heure -----
-  // Formats : HH:MM, HHhMM, HH h MM
   const timeRegex = /\b([01]?\d|2[0-3])\s*[:hH]\s*([0-5]\d)\b/;
   const timeMatch = text.match(timeRegex);
   if (timeMatch) {
@@ -727,13 +858,27 @@ function applyParsedData(parsed) {
   }
   if (parsed.time) {
     document.getElementById('form-time').value = parsed.time;
-    // Si une heure est détectée, suggère une catégorie repas
-    // (l'utilisateur peut toujours changer pour taxi/logement/autre)
-    const suggestedCat = categorizeMealByTime(parsed.time);
-    const currentCat = document.getElementById('form-category').value;
-    // Ne change que si on est encore sur la valeur par défaut
-    if (suggestedCat && currentCat === 'taxi') {
-      document.getElementById('form-category').value = suggestedCat;
+  }
+
+  // Pré-remplit la description avec le nom du marchand si rien n'est saisi
+  if (parsed.merchant) {
+    const descField = document.getElementById('form-description');
+    if (!descField.value.trim()) {
+      descField.value = parsed.merchant;
+    }
+  }
+
+  // Détermine la catégorie : transportHint a la priorité (mots-clés explicites),
+  // sinon on déduit du créneau horaire pour les repas.
+  // On ne change que si l'utilisateur n'a pas déjà choisi (catégorie reste sur "taxi" par défaut).
+  const catField = document.getElementById('form-category');
+  const currentCat = catField.value;
+  if (currentCat === 'taxi') { // valeur par défaut, on peut donc remplacer
+    if (parsed.transportHint) {
+      catField.value = parsed.transportHint;
+    } else if (parsed.time) {
+      const suggestedCat = categorizeMealByTime(parsed.time);
+      if (suggestedCat) catField.value = suggestedCat;
     }
   }
 }
@@ -1033,11 +1178,19 @@ document.getElementById('form-photo').addEventListener('change', handlePhoto);
 document.getElementById('camera-btn').addEventListener('click', () => {
   const input = document.getElementById('form-photo');
   input.setAttribute('capture', 'environment');
+  input.setAttribute('accept', 'image/*');
   input.click();
 });
 document.getElementById('gallery-btn').addEventListener('click', () => {
   const input = document.getElementById('form-photo');
   input.removeAttribute('capture');
+  input.setAttribute('accept', 'image/*');
+  input.click();
+});
+document.getElementById('pdf-btn').addEventListener('click', () => {
+  const input = document.getElementById('form-photo');
+  input.removeAttribute('capture');
+  input.setAttribute('accept', 'application/pdf');
   input.click();
 });
 document.getElementById('export-btn').addEventListener('click', generatePDF);
