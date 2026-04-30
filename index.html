@@ -698,51 +698,188 @@ async function runOCR(canvas) {
 }
 
 // ============== Parsing du texte OCR ==============
+
+// Score de qualité d'une ligne : retourne true si la ligne ressemble
+// à du vrai texte (pas du charabia OCR comme "PI22A ve pus . NE")
+function looksLikeRealText(line) {
+  const cleaned = line.replace(/[^a-zA-ZÀ-ÿ]/g, '');
+  if (cleaned.length < 3) return false;
+
+  const lower = cleaned.toLowerCase();
+  const vowels = (lower.match(/[aeiouyàâéèêëîïôöùûü]/g) || []).length;
+  const consonants = lower.length - vowels;
+
+  // Une ligne avec 0 voyelle de plus de 4 lettres est suspecte
+  if (cleaned.length >= 4 && vowels === 0) return false;
+
+  // Ratio voyelles : entre 15% et 70% pour du texte normal
+  const ratio = vowels / cleaned.length;
+  if (ratio < 0.15 || ratio > 0.75) return false;
+
+  // Séquences improbables : 3+ consonnes rares d'affilée
+  if (/[bcdfghjklmnpqrstvwxz]{5,}/i.test(cleaned)) return false;
+
+  // Présence de chiffres au milieu de lettres (ex: "PI22A") = OCR loupé
+  // On tolère quelques chiffres mais pas mélangés au milieu d'un mot
+  const mixedDigit = /[a-zA-ZÀ-ÿ]\d{1,2}[a-zA-ZÀ-ÿ]/;
+  if (mixedDigit.test(line)) return false;
+
+  return true;
+}
+
+function extractMerchant(lines, fullText) {
+  if (!lines || lines.length === 0) return null;
+
+  // Cas spécial 1 : transports en commun (Keolis/STAR/RATP/etc.)
+  // Si on détecte une facture de transport, on construit une description utile.
+  const transportDesc = buildTransportDescription(fullText);
+  if (transportDesc) return transportDesc;
+
+  // Cas général : on filtre les lignes des 15 premières
+  const skipPatterns = [
+    /^\d+$/,                                              // que des chiffres
+    /^[\d\s\-\.\/]+$/,                                    // chiffres + ponctuation
+    /\bsiret\b/i,
+    /\btva\b\s*(intra|fr|n°|\d)/i,
+    /\b(rue|avenue|boulevard|bd|av\.?|place|impasse|allée|chemin|square)\b/i,
+    /\b\d{5}\b/,                                          // code postal
+    /^t[ée]l\b/i,
+    /^https?:/i,
+    /^www\./i,
+    /^@/,
+    /^[\-=*_~+]{3,}/,                                     // séparateurs
+    /\b(facture|ticket|reçu|recu|caisse|client|n°|date|heure)\b/i,
+    /\bvotre\s+(facture|reçu|ticket)\b/i,
+    /\bvalidation\s+par\s+carte/i,
+    /\bcarte\s+banca?ire/i,
+    /\bréférences?\b/i,
+    /\bidentifiant\b/i,
+  ];
+  const genericTerms = /^(restaurant|pizzeria|pizz?a\s+napolitaine|pizz?a\s+italienne|brasserie|café|bar|boulangerie|p[âa]tisserie|sandwicherie|kebab|crêperie|creperie|salon\s+de\s+th[ée]|fast[\s\-]?food|food\s*truck|cuisine\s+\w+)\s*$/i;
+
+  // 1ère passe : on classe chaque ligne candidate avec un score
+  const candidates = [];
+  for (let i = 0; i < Math.min(lines.length, 15); i++) {
+    const line = lines[i];
+    if (line.length < 3 || line.length > 60) continue;
+    if (skipPatterns.some(rx => rx.test(line))) continue;
+    if (genericTerms.test(line)) continue;
+
+    const letters = line.replace(/[^a-zA-ZÀ-ÿ]/g, '');
+    if (letters.length < 3) continue;
+
+    if (!looksLikeRealText(line)) continue;
+
+    // Nettoyage
+    let cleaned = line.replace(/^[^a-zA-ZÀ-ÿ0-9]+|[^a-zA-ZÀ-ÿ0-9\s&\.\-']+$/g, '').trim();
+    cleaned = cleaned.replace(/\s+/g, ' ');
+    if (cleaned.length < 3 || cleaned.length > 50) continue;
+
+    // Score : MAJUSCULES = bonus (typique d'un nom commercial en haut de ticket)
+    let score = 0;
+    score += (15 - i); // les premières lignes ont la priorité
+    if (cleaned === cleaned.toUpperCase() && /[A-Z]/.test(cleaned)) score += 5;
+    if (/^[A-ZÀ-Ÿ]/.test(cleaned)) score += 2; // commence par une majuscule
+    if (cleaned.length >= 4 && cleaned.length <= 25) score += 3; // longueur typique
+
+    candidates.push({ line: cleaned, score, index: i });
+  }
+
+  if (candidates.length === 0) return null;
+
+  // 2ème passe : ancrage par adresse
+  // Si une ligne d'adresse (ou code postal) est détectée, le marchand est
+  // souvent la candidate juste au-dessus. On boost ces candidates.
+  let addressIndex = -1;
+  for (let i = 0; i < Math.min(lines.length, 20); i++) {
+    if (/\b\d{5}\b/.test(lines[i]) || /\b(rue|avenue|boulevard|bd|av\.?)\b/i.test(lines[i])) {
+      addressIndex = i;
+      break;
+    }
+  }
+  if (addressIndex > 0) {
+    for (const c of candidates) {
+      const distance = addressIndex - c.index;
+      if (distance >= 1 && distance <= 4) c.score += 8; // gros bonus
+    }
+  }
+
+  // On retourne la meilleure candidate
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0].line;
+}
+
+// Construit une description utile pour les factures de transport en commun
+// Ex: "Bus C4 - République" depuis une facture Keolis/STAR
+function buildTransportDescription(fullText) {
+  if (!fullText) return null;
+  const upper = fullText.toUpperCase();
+
+  // Détection d'opérateurs de transport en commun
+  const isTransport = /\b(KEOLIS|STAR\b|RATP|SNCF|TER|TGV|TRANSDEV|ILEVIA|TISSEO|TBM|TCL|TAN)\b/.test(upper);
+  if (!isTransport) return null;
+
+  // Cherche le mode (Bus/Métro/Tram/Train) et la ligne
+  let mode = null;
+  if (/\bBUS\b/.test(upper)) mode = 'Bus';
+  else if (/\bMÉTRO\b|\bMETRO\b/.test(upper)) mode = 'Métro';
+  else if (/\bTRAM(WAY)?\b/.test(upper)) mode = 'Tram';
+  else if (/\bTRAIN\b|\bTGV\b|\bTER\b/.test(upper)) mode = 'Train';
+
+  // Cherche un identifiant de ligne (C4, A, 1, M14, etc.)
+  // Patterns : "Bus C4", "Ligne C4", "Métro 1"
+  let lineId = null;
+  const linePatterns = [
+    /\b(?:bus|m[ée]tro|tram|ligne)\s+([A-Z]?\d{1,3}[A-Z]?)\b/i,
+    /\bligne\s+([A-Z]\d?)\b/i,
+  ];
+  for (const rx of linePatterns) {
+    const m = fullText.match(rx);
+    if (m) { lineId = m[1].toUpperCase(); break; }
+  }
+
+  // Cherche une station d'arrêt
+  // Sur les factures Keolis, "Station d'arrêt" précède le nom
+  let station = null;
+  const stationMatch = fullText.match(/station\s+d['']arr[êe]t[\s\S]{0,80}?\n?\s*([A-ZÀ-Ÿ][a-zA-ZÀ-ÿ\-' ]{2,30})/i);
+  if (stationMatch) {
+    station = stationMatch[1].trim().replace(/\s+/g, ' ');
+    // On enlève les éventuels mots-clés résiduels
+    station = station.replace(/\b(prix|ttc|montant|total|euro|€)\b.*/i, '').trim();
+    if (station.length > 30) station = station.slice(0, 30).trim();
+  }
+
+  // Construction de la description
+  const parts = [];
+  if (mode) {
+    parts.push(lineId ? `${mode} ${lineId}` : mode);
+  }
+  if (station) parts.push(station);
+
+  if (parts.length > 0) return parts.join(' - ');
+
+  // Fallback : juste l'opérateur
+  if (/KEOLIS|\bSTAR\b/.test(upper)) return 'Transport STAR (Rennes)';
+  if (/RATP/.test(upper)) return 'Transport RATP';
+  if (/SNCF/.test(upper)) return 'SNCF';
+  return 'Transport en commun';
+}
+
 function parseReceiptText(text) {
   const result = { amount: null, date: null, time: null, merchant: null, transportHint: null };
   if (!text) return result;
 
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
 
-  // ----- Marchand : on cherche dans les premières lignes utiles -----
-  // Heuristique : on parcourt les ~10 premières lignes, on saute :
-  // - les lignes purement numériques / codes
-  // - les lignes très courtes (< 3 lettres)
-  // - les lignes contenant une adresse ou des codes SIRET/TVA
-  // - les lignes "RESTAURANT", "TICKET", etc. (mots génériques)
-  // On garde la 1ʳᵉ ligne avec au moins 3 lettres consécutives, qui n'est pas un descripteur.
-  const skipPatterns = [
-    /^\d+$/,                          // que des chiffres
-    /^[\d\s\-\.\/]+$/,                // chiffres + ponctuation
-    /\bsiret\b/i,
-    /\btva\b\s*(intra|fr|n°)/i,
-    /\b(rue|avenue|boulevard|bd|av|place|impasse)\b/i, // adresses
-    /\b\d{5}\s/,                      // code postal
-    /^t[ée]l/i,
-    /^https?:/i,
-    /^www\./i,
-    /^@/,
-    /^[\-=*_]+$/,                     // séparateurs
-  ];
-  const genericTerms = /^(restaurant|ticket|facture|recu|reçu|votre\s+(facture|reçu|ticket)|caisse|client)\s*$/i;
-
-  let merchantCandidate = null;
-  for (let i = 0; i < Math.min(lines.length, 12); i++) {
-    const line = lines[i];
-    if (line.length < 2) continue;
-    if (skipPatterns.some(rx => rx.test(line))) continue;
-    if (genericTerms.test(line)) continue;
-    // Doit contenir au moins 3 lettres
-    const letters = line.replace(/[^a-zA-ZÀ-ÿ]/g, '');
-    if (letters.length < 3) continue;
-    // Nettoyage : on enlève les caractères bizarres en début/fin
-    let cleaned = line.replace(/^[^a-zA-ZÀ-ÿ0-9]+|[^a-zA-ZÀ-ÿ0-9]+$/g, '').trim();
-    // On limite à 40 caractères
-    if (cleaned.length > 40) cleaned = cleaned.slice(0, 40).trim();
-    merchantCandidate = cleaned;
-    break;
-  }
-  if (merchantCandidate) result.merchant = merchantCandidate;
+  // ----- Marchand : extraction robuste -----
+  // Stratégie :
+  //  1. On scanne les ~15 premières lignes
+  //  2. On rejette : adresses, codes, téléphones, séparateurs, mots génériques
+  //  3. On rejette le CHARABIA OCR via score de qualité (ratio voyelles, séquences improbables)
+  //  4. On préfère les lignes en MAJUSCULES de 4-30 chars (typique du nom commercial)
+  //  5. Bonus : si on trouve une ligne d'adresse, le marchand est probablement
+  //     1-3 lignes au-dessus
+  result.merchant = extractMerchant(lines, text);
 
   // ----- Détection transport (mots-clés) -----
   const upperText = text.toUpperCase();
