@@ -1329,26 +1329,35 @@ async function runOCR(imageData) {
       return 'repas';
     };
 
+    let categoryDetected = false;
+
     if (data.category) {
       const catLower = data.category.toLowerCase();
       const subCatLower = (data.subcategory || '').toLowerCase();
 
       if (catLower.includes('transport') || subCatLower.includes('taxi') || subCatLower.includes('uber')) {
-        catField.value = 'taxi';
+        catField.value = 'taxi'; categoryDetected = true;
       } else if (subCatLower.includes('train') || subCatLower.includes('sncf')) {
-        catField.value = 'train';
+        catField.value = 'train'; categoryDetected = true;
       } else if (subCatLower.includes('bus') || subCatLower.includes('metro') || subCatLower.includes('métro')) {
         catField.value = (subCatLower.includes('metro') || subCatLower.includes('métro')) ? 'metro' : 'bus';
+        categoryDetected = true;
       } else if (catLower.includes('accommodation') || catLower.includes('hotel') || catLower.includes('lodging') || catLower.includes('hébergement')) {
-        catField.value = 'logement';
+        catField.value = 'logement'; categoryDetected = true;
       } else if (
         catLower.includes('food') || catLower.includes('restaurant') || catLower.includes('meal') ||
         catLower.includes('restauration') || catLower.includes('alimentation') || catLower.includes('repas') ||
         catLower.includes('café') || catLower.includes('cafe') || catLower.includes('brasserie') ||
         catLower.includes('snack') || catLower.includes('traiteur') || catLower.includes('epicerie')
       ) {
-        catField.value = getMealByHour(mealHour);
+        catField.value = getMealByHour(mealHour); categoryDetected = true;
       }
+    }
+
+    // Fallback : Mindee n'a pas retourné de catégorie mais a détecté l'heure sur le ticket
+    // → c'est probablement un ticket de caisse (restaurant/café), on déduit par l'heure
+    if (!categoryDetected && data.time) {
+      catField.value = getMealByHour(mealHour);
     }
 
     // Build success message
