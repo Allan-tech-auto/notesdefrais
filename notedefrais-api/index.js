@@ -3943,13 +3943,17 @@ app.post("/api/ocr", async (c) => {
     if (!image) {
       return c.json({ error: "Image requise" }, 400);
     }
-    const base64Match = image.match(/^data:([^;]+);base64,(.+)$/);
-    if (!base64Match) {
+    // Retirer le préfixe data-URI si présent
+    const base64Data = image.includes(",") ? image.split(",")[1] : image;
+    if (!base64Data) {
       return c.json({ error: "Format image invalide" }, 400);
     }
-    const base64Data = base64Match[2];
+
     const MODEL_ID = "ac958a08-2d1b-4b43-8e25-6dc9354c5940";
-    const enqueueResponse = await fetch("https://api-v2.mindee.net/v2/products/extraction/enqueue", {
+    const ENQUEUE_URL = "https://api-v2.mindee.net/v2/inferences/enqueue";
+
+    // ── 1. Enqueue ──────────────────────────────────────────────
+    const enqueueResponse = await fetch(ENQUEUE_URL, {
       method: "POST",
       headers: {
         "Authorization": c.env.MINDEE_API_KEY,
@@ -3960,77 +3964,126 @@ app.post("/api/ocr", async (c) => {
         file_base64: base64Data
       })
     });
+
     const enqueueText = await enqueueResponse.text();
     if (!enqueueResponse.ok) {
       console.error("Mindee enqueue error:", enqueueResponse.status, enqueueText);
-      return c.json({
-        error: `Mindee (${enqueueResponse.status}): ${enqueueText.slice(0, 300)}`
-      }, 500);
+      return c.json({ error: `Mindee enqueue (${enqueueResponse.status}): ${enqueueText.slice(0, 300)}` }, 500);
     }
+
     let enqueueData;
     try {
       enqueueData = JSON.parse(enqueueText);
     } catch {
-      return c.json({ error: "R\xE9ponse invalide", debug: enqueueText.slice(0, 500) }, 500);
+      return c.json({ error: "Réponse enqueue invalide", debug: enqueueText.slice(0, 500) }, 500);
     }
-    const jobId = enqueueData.job?.id || enqueueData.id;
-    if (!jobId) {
-      return c.json({ error: "Pas de job_id", debug: enqueueData }, 500);
+
+    const pollingUrl = enqueueData.job?.polling_url;
+    if (!pollingUrl) {
+      return c.json({ error: "polling_url absente", debug: enqueueData }, 500);
     }
-    const maxAttempts = 15;
-    const pollInterval = 2e3;
-    let result = null;
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, pollInterval));
-      const pollResponse = await fetch(`https://api-v2.mindee.net/v2/jobs/${jobId}`, {
-        headers: { "Authorization": c.env.MINDEE_API_KEY }
+
+    // ── 2. Poll avec redirect: "manual" ─────────────────────────
+    // CRITIQUE : ne pas suivre les redirections pour éviter d'envoyer
+    // l'Authorization vers S3/GCS ce qui causerait un 403
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    const MAX_RETRIES = 40;
+    const POLL_INTERVAL_MS = 1500;
+    let resultUrl = null;
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const pollResponse = await fetch(pollingUrl, {
+        method: "GET",
+        headers: { "Authorization": c.env.MINDEE_API_KEY },
+        redirect: "manual"
       });
-      if (pollResponse.status === 302) {
-        const redirectUrl = pollResponse.headers.get("Location");
-        if (redirectUrl) {
-          const docResponse = await fetch(redirectUrl, {
-            headers: { "Authorization": c.env.MINDEE_API_KEY }
-          });
-          result = await docResponse.json();
+
+      // Cas A : Mindee renvoie une 302 → Location contient le result_url
+      if (pollResponse.status >= 300 && pollResponse.status < 400) {
+        const location = pollResponse.headers.get("Location");
+        if (location) {
+          resultUrl = location;
           break;
         }
       }
-      const pollData = await pollResponse.json().catch(() => null);
-      if (!pollData) continue;
-      const status = pollData.job?.status || pollData.status;
-      if (status === "completed" || status === "succeeded") {
-        result = pollData;
-        break;
-      } else if (status === "failed" || status === "error") {
-        return c.json({ error: "Extraction \xE9chou\xE9e", debug: pollData }, 500);
+
+      // Cas B : réponse JSON classique
+      if (pollResponse.ok) {
+        const pollData = await pollResponse.json().catch(() => null);
+        if (!pollData) {
+          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+          continue;
+        }
+        const status = pollData.job?.status;
+        if (status === "Failed") {
+          return c.json({ error: "Extraction échouée", debug: pollData.job }, 500);
+        }
+        if (status === "Processed" || pollData.job?.result_url) {
+          resultUrl = pollData.job.result_url;
+          if (resultUrl) break;
+        }
+        // "Processing" ou "Waiting" → on continue
       }
+
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
-    if (!result) {
-      return c.json({ error: "Timeout - traitement trop long", jobId }, 504);
+
+    if (!resultUrl) {
+      return c.json({ error: "Timeout - traitement trop long", pollingUrl }, 504);
     }
-    const inference = result.inference || result.document?.inference || {};
-    const fields = inference.fields || inference.prediction || result.fields || {};
-    const getValue = /* @__PURE__ */ __name((field) => {
-      if (!field) return null;
-      if (typeof field === "object" && "value" in field) return field.value;
-      if (typeof field === "object" && "content" in field) return field.content;
-      return field;
-    }, "getValue");
-    const ocrResult = {
-      supplierName: getValue(fields.supplier_name) || getValue(fields.merchant_name) || getValue(fields.store_name),
-      date: getValue(fields.date) || getValue(fields.purchase_date),
-      time: getValue(fields.time) || getValue(fields.purchase_time),
-      totalAmount: getValue(fields.total_amount) || getValue(fields.total) || getValue(fields.total_incl),
-      totalTax: getValue(fields.total_tax) || getValue(fields.taxes),
-      currency: getValue(fields.currency) || getValue(fields.locale?.currency) || "EUR",
-      category: getValue(fields.category),
-      subcategory: getValue(fields.subcategory),
-      _debug: result
+
+    // ── 3. Récupérer le résultat ────────────────────────────────
+    // N'envoyer Authorization QUE si l'URL reste chez mindee.net
+    const resultHeaders = {};
+    try {
+      const hostname = new URL(resultUrl).hostname;
+      if (hostname.endsWith("mindee.net") || hostname.endsWith("mindee.com")) {
+        resultHeaders["Authorization"] = c.env.MINDEE_API_KEY;
+      }
+    } catch {
+      resultHeaders["Authorization"] = c.env.MINDEE_API_KEY;
+    }
+
+    const resultResponse = await fetch(resultUrl, {
+      method: "GET",
+      headers: resultHeaders
+    });
+
+    if (!resultResponse.ok) {
+      const errText = await resultResponse.text();
+      return c.json({ error: `Mindee result fetch (${resultResponse.status}): ${errText.slice(0, 300)}` }, 500);
+    }
+
+    const result = await resultResponse.json();
+
+    // ── 4. Extraire les champs ──────────────────────────────────
+    const fields = result.inference?.result?.fields;
+    if (!fields) {
+      return c.json({ error: "Structure Mindee inattendue", debug: JSON.stringify(result).slice(0, 500) }, 500);
+    }
+
+    const v = (name) => {
+      const f = fields[name];
+      if (!f) return null;
+      if (typeof f === "object" && "value" in f) return f.value;
+      if (typeof f === "object" && "content" in f) return f.content;
+      return f;
     };
+
+    const ocrResult = {
+      supplierName: v("supplier_name"),
+      date: v("date"),
+      time: v("time"),
+      totalAmount: v("total_amount"),
+      currency: v("currency"),
+      category: v("category")
+    };
+
     return c.json(ocrResult);
   } catch (error) {
     console.error("OCR error:", error);
-    return c.json({ error: "Erreur lors de l'analyse OCR" }, 500);
+    return c.json({ error: "Erreur lors de l'analyse OCR", detail: error.message }, 500);
   }
 });
 app.get("/api/health", (c) => {
