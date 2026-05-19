@@ -1317,6 +1317,18 @@ async function runOCR(imageData) {
 
     // Auto-detect category based on Mindee's category
     const catField = document.getElementById('form-category');
+
+    // Heure utilisée pour détecter le type de repas :
+    // priorité à l'heure OCR du ticket, sinon l'heure actuelle du scan
+    const timeForMeal = data.time || new Date().toTimeString().slice(0, 5);
+    const mealHour = parseInt(timeForMeal.split(':')[0]);
+    const getMealByHour = (h) => {
+      if (h >= 6 && h < 11) return 'petit_dej';
+      if (h >= 11 && h < 15) return 'dejeuner';
+      if (h >= 18 && h < 23) return 'diner';
+      return 'repas';
+    };
+
     if (data.category) {
       const catLower = data.category.toLowerCase();
       const subCatLower = (data.subcategory || '').toLowerCase();
@@ -1325,21 +1337,17 @@ async function runOCR(imageData) {
         catField.value = 'taxi';
       } else if (subCatLower.includes('train') || subCatLower.includes('sncf')) {
         catField.value = 'train';
-      } else if (subCatLower.includes('bus') || subCatLower.includes('metro')) {
-        catField.value = catLower.includes('metro') ? 'metro' : 'bus';
-      } else if (catLower.includes('accommodation') || catLower.includes('hotel') || catLower.includes('lodging')) {
+      } else if (subCatLower.includes('bus') || subCatLower.includes('metro') || subCatLower.includes('métro')) {
+        catField.value = (subCatLower.includes('metro') || subCatLower.includes('métro')) ? 'metro' : 'bus';
+      } else if (catLower.includes('accommodation') || catLower.includes('hotel') || catLower.includes('lodging') || catLower.includes('hébergement')) {
         catField.value = 'logement';
-      } else if (catLower.includes('food') || catLower.includes('restaurant') || catLower.includes('meal')) {
-        // Detect meal type by time
-        if (data.time) {
-          const hour = parseInt(data.time.split(':')[0]);
-          if (hour >= 6 && hour < 11) catField.value = 'petit_dej';
-          else if (hour >= 11 && hour < 15) catField.value = 'dejeuner';
-          else if (hour >= 18 && hour < 23) catField.value = 'diner';
-          else catField.value = 'repas';
-        } else {
-          catField.value = 'repas';
-        }
+      } else if (
+        catLower.includes('food') || catLower.includes('restaurant') || catLower.includes('meal') ||
+        catLower.includes('restauration') || catLower.includes('alimentation') || catLower.includes('repas') ||
+        catLower.includes('café') || catLower.includes('cafe') || catLower.includes('brasserie') ||
+        catLower.includes('snack') || catLower.includes('traiteur') || catLower.includes('epicerie')
+      ) {
+        catField.value = getMealByHour(mealHour);
       }
     }
 
@@ -1718,12 +1726,20 @@ async function generatePDF() {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     let grandTotal = 0;
-    SUMMARY_ORDER.forEach(catId => {
-      const v = totalsByCategory[catId] || 0;
-      grandTotal += v;
+    SUMMARY_ORDER.forEach(catId => { grandTotal += totalsByCategory[catId] || 0; });
+
+    // Affichage : Bus + Métro regroupés en "Transports en commun"
+    const displayCategories = SUMMARY_ORDER.filter(c => c !== 'metro');
+    displayCategories.forEach(catId => {
+      let v = totalsByCategory[catId] || 0;
+      let label = CATEGORIES[catId].label;
+      if (catId === 'bus') {
+        v += totalsByCategory['metro'] || 0;
+        label = 'Transports en commun';
+      }
       if (v > 0) {
         if (y > pageH - 25) { doc.addPage(); y = 20; }
-        doc.text(CATEGORIES[catId].label, margin + 5, y);
+        doc.text(label, margin + 5, y);
         doc.text(v.toFixed(2) + ' €', margin + 80, y, { align: 'right' });
         y += 5;
       }
