@@ -372,18 +372,13 @@ app.delete('/api/expenses/:id', async (c) => {
 
 const VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
 
-const EXTRACTION_PROMPT = `Tu es un assistant d'extraction de données de tickets de caisse.
-Analyse l'image du ticket et renvoie UNIQUEMENT un objet JSON valide, sans texte avant ou après, sans balises Markdown.
-Le JSON doit avoir exactement cette structure :
-{
-  "supplierName": "nom du commerce ou null",
-  "date": "date au format AAAA-MM-JJ ou null",
-  "time": "heure au format HH:MM ou null",
-  "totalAmount": nombre (montant total TTC) ou null,
-  "currency": "code devise ISO (EUR, USD...) ou null",
-  "category": "une catégorie parmi: restaurant, transport, courses, carburant, hebergement, sante, loisirs, autre"
-}
-Si une information est absente, mets null. Pour totalAmount, renvoie un nombre sans symbole.`;
+const SYSTEM_PROMPT = `You are a JSON-only data extraction assistant. You MUST respond with a single valid JSON object and absolutely nothing else. No explanations, no markdown, no text before or after the JSON.`;
+
+const EXTRACTION_PROMPT = `Look at this receipt image carefully. Extract data and return ONLY a valid JSON object, no other text.
+
+{"supplierName":"business name at the top of the receipt","date":"read the date printed on the receipt and convert to YYYY-MM-DD format (e.g. 15/03/2025 becomes 2025-03-15)","time":"time printed on the receipt in HH:MM 24h format","totalAmount":14.50,"currency":"EUR","category":"repas (restaurant/food/meal/bar), taxi (taxi/VTC/uber), bus, metro, train, logement (hotel), autre"}
+
+Important: never use the word null. If a field is missing, use empty string. totalAmount must be a number.`;
 
 function stripBase64Prefix(base64: string): string {
   return base64.includes(',') ? base64.split(',')[1] : base64;
@@ -417,6 +412,7 @@ app.post('/api/ocr', async (c) => {
     try {
       aiResponse = await c.env.AI.run(VISION_MODEL as any, {
         messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
           {
             role: 'user',
             content: [
@@ -425,36 +421,65 @@ app.post('/api/ocr', async (c) => {
             ],
           },
         ],
-        max_tokens: 512,
+        max_tokens: 256,
       } as any) as { response?: string };
     } catch (err: any) {
       console.error('Workers AI error:', err);
       return c.json({ error: `Workers AI a échoué : ${err.message}` }, 500);
     }
 
-    const rawText = typeof aiResponse?.response === 'string'
-      ? aiResponse.response
-      : JSON.stringify(aiResponse);
-    const parsed = safeParseJson(rawText);
-
-    if (!parsed) {
-      console.error('OCR parse error, raw response:', rawText.slice(0, 500));
-      return c.json({ error: 'Impossible de parser la réponse du modèle', debug: rawText.slice(0, 500) }, 500);
+    let parsed: Record<string, any> | null = null;
+    if (typeof aiResponse?.response === 'object' && aiResponse.response !== null) {
+      parsed = aiResponse.response as Record<string, any>;
+    } else {
+      const rawText = typeof aiResponse?.response === 'string'
+        ? aiResponse.response
+        : JSON.stringify(aiResponse);
+      parsed = safeParseJson(rawText);
     }
 
+    if (!parsed) {
+      console.error('OCR parse error, raw response:', JSON.stringify(aiResponse).slice(0, 500));
+      return c.json({
+        supplierName: null, date: null, time: null,
+        totalAmount: null, currency: null, category: null,
+        _warning: 'Lecture automatique impossible, saisissez manuellement.',
+      });
+    }
+
+    const clean = (v: any): string | null => {
+      if (v === null || v === undefined || v === 'null' || v === 'undefined' || String(v).trim() === '') return null;
+      return String(v).trim();
+    };
+
     const toNumber = (v: any): number | null => {
-      if (v === null || v === undefined) return null;
-      const n = parseFloat(String(v).replace(',', '.'));
+      if (v === null || v === undefined || v === 'null') return null;
+      const n = parseFloat(String(v).replace(',', '.').replace(/[^\d.]/g, ''));
       return Number.isNaN(n) ? null : n;
     };
 
+    const normalizeCategory = (v: any): string => {
+      const c = (clean(v) ?? '').toLowerCase();
+      if (!c) return 'autre';
+      const isMeal = ['repas','restaurant','food','meal','bar','brasserie','café','cafe','alimentation',
+        'dejeuner','déjeuner','diner','dîner','petit','breakfast','lunch','dinner','bistro','pizz',
+        'burger','kebab','sushi','traiteur','cantine','snack','buffet','mcd','mcdo','kfc','subway'].some(k => c.includes(k));
+      if (isMeal) return 'repas';
+      if (['taxi','vtc','uber','bolt','heetch','cab'].some(k => c.includes(k))) return 'taxi';
+      if (c.includes('bus') || c.includes('car ') || c.includes('autocar')) return 'bus';
+      if (c.includes('metro') || c.includes('métro') || c.includes('rer')) return 'metro';
+      if (['train','sncf','tgv','intercités','ouigo','rail','eurostar'].some(k => c.includes(k))) return 'train';
+      if (['hotel','hôtel','logement','hébergement','hebergement','airbnb','ibis','novotel','chambre'].some(k => c.includes(k))) return 'logement';
+      return 'autre';
+    };
+
     return c.json({
-      supplierName: parsed.supplierName ?? null,
-      date: parsed.date ?? null,
-      time: parsed.time ?? null,
+      supplierName: clean(parsed.supplierName),
+      date: clean(parsed.date),
+      time: clean(parsed.time),
       totalAmount: toNumber(parsed.totalAmount),
-      currency: parsed.currency ?? null,
-      category: parsed.category ?? null,
+      currency: clean(parsed.currency) ?? 'EUR',
+      category: normalizeCategory(parsed.category),
     });
   } catch (error: any) {
     console.error('OCR error:', error);

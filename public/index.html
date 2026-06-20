@@ -1269,6 +1269,30 @@ async function handlePdfFile(file) {
   }
 }
 
+function normalizeDate(raw) {
+  if (!raw) return '';
+  const s = raw.trim();
+  // YYYY-MM-DD (already correct)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+  const dmy4 = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+  if (dmy4) return `${dmy4[3]}-${dmy4[2].padStart(2,'0')}-${dmy4[1].padStart(2,'0')}`;
+  // DD/MM/YY (2-digit year)
+  const dmy2 = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2})$/);
+  if (dmy2) return `20${dmy2[3]}-${dmy2[2].padStart(2,'0')}-${dmy2[1].padStart(2,'0')}`;
+  // YYYY/MM/DD or YYYY.MM.DD
+  const ymd = s.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+  if (ymd) return `${ymd[1]}-${ymd[2].padStart(2,'0')}-${ymd[3].padStart(2,'0')}`;
+  // French text: "20 juin 2026" or "20 Juin 2026"
+  const months = {janvier:1,février:2,fevrier:2,mars:3,avril:4,mai:5,juin:6,juillet:7,août:8,aout:8,septembre:9,octobre:10,novembre:11,décembre:12,decembre:12};
+  const fr = s.toLowerCase().match(/^(\d{1,2})\s+([a-zéûô]+)\s+(\d{4})$/);
+  if (fr && months[fr[2]]) return `${fr[3]}-${String(months[fr[2]]).padStart(2,'0')}-${fr[1].padStart(2,'0')}`;
+  // Fallback: native Date parse
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  return '';
+}
+
 async function runOCR(imageData) {
   const status = document.getElementById('ocr-status');
   const message = document.getElementById('ocr-message');
@@ -1302,7 +1326,7 @@ async function runOCR(imageData) {
       document.getElementById('form-amount').value = data.totalAmount.toFixed(2);
     }
     if (data.date) {
-      document.getElementById('form-date').value = data.date;
+      document.getElementById('form-date').value = normalizeDate(data.date);
     }
     if (data.time) {
       // Format time if needed (Mindee returns HH:MM:SS, we want HH:MM)
@@ -1313,26 +1337,23 @@ async function runOCR(imageData) {
       document.getElementById('form-description').value = data.supplierName;
     }
 
-    // Auto-detect category based on Workers AI category
+    // Map AI category to form value, with time-based meal classification
     const catField = document.getElementById('form-category');
     if (data.category) {
-      const cat = data.category.toLowerCase();
-      if (cat === 'transport') {
-        catField.value = 'taxi';
-      } else if (cat === 'hebergement') {
-        catField.value = 'logement';
-      } else if (cat === 'restaurant') {
+      const cat = data.category.toLowerCase().trim();
+      if (cat === 'repas' || cat === 'restaurant') {
         if (data.time) {
           const hour = parseInt(data.time.split(':')[0]);
           if (hour >= 6 && hour < 11) catField.value = 'petit_dej';
-          else if (hour >= 11 && hour < 15) catField.value = 'dejeuner';
-          else if (hour >= 18 && hour < 23) catField.value = 'diner';
-          else catField.value = 'repas';
+          else if (hour >= 15 && hour < 19) catField.value = 'diner';
+          else if (hour >= 19) catField.value = 'diner';
+          else catField.value = 'dejeuner';
         } else {
-          catField.value = 'repas';
+          catField.value = 'dejeuner';
         }
       } else {
-        catField.value = 'autre';
+        const validCategories = ['taxi','bus','metro','train','logement','autre'];
+        catField.value = validCategories.includes(cat) ? cat : 'autre';
       }
     }
 
@@ -1344,7 +1365,9 @@ async function runOCR(imageData) {
     if (data.time) found.push('heure');
     if (data.category) found.push(data.category);
 
-    if (found.length > 0) {
+    if (data._warning) {
+      message.textContent = '⚠ ' + data._warning;
+    } else if (found.length > 0) {
       status.classList.add('success');
       message.textContent = '✓ ' + found.join(', ');
     } else {
