@@ -30,7 +30,7 @@ import {
 interface Env {
   DB: D1Database;
   JWT_SECRET: string;
-  MINDEE_API_KEY: string;
+  AI: Ai;
 }
 
 interface Variables {
@@ -368,7 +368,40 @@ app.delete('/api/expenses/:id', async (c) => {
   return c.json({ success: true });
 });
 
-// ==================== OCR MINDEE ====================
+// ==================== OCR WORKERS AI ====================
+
+const VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
+
+const EXTRACTION_PROMPT = `Tu es un assistant d'extraction de données de tickets de caisse.
+Analyse l'image du ticket et renvoie UNIQUEMENT un objet JSON valide, sans texte avant ou après, sans balises Markdown.
+Le JSON doit avoir exactement cette structure :
+{
+  "supplierName": "nom du commerce ou null",
+  "date": "date au format AAAA-MM-JJ ou null",
+  "time": "heure au format HH:MM ou null",
+  "totalAmount": nombre (montant total TTC) ou null,
+  "currency": "code devise ISO (EUR, USD...) ou null",
+  "category": "une catégorie parmi: restaurant, transport, courses, carburant, hebergement, sante, loisirs, autre"
+}
+Si une information est absente, mets null. Pour totalAmount, renvoie un nombre sans symbole.`;
+
+function stripBase64Prefix(base64: string): string {
+  return base64.includes(',') ? base64.split(',')[1] : base64;
+}
+
+function safeParseJson(text: string): Record<string, any> | null {
+  if (!text) return null;
+  let cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start === -1 || end === -1) return null;
+  cleaned = cleaned.slice(start, end + 1);
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    return null;
+  }
+}
 
 app.post('/api/ocr', async (c) => {
   try {
@@ -378,116 +411,54 @@ app.post('/api/ocr', async (c) => {
       return c.json({ error: 'Image requise' }, 400);
     }
 
-    // Extract base64 data from data URL
-    const base64Match = image.match(/^data:([^;]+);base64,(.+)$/);
-    if (!base64Match) {
-      return c.json({ error: 'Format image invalide' }, 400);
-    }
+    const cleanBase64 = stripBase64Prefix(image);
 
-    const base64Data = base64Match[2];
-    const MODEL_ID = 'ac958a08-2d1b-4b43-8e25-6dc9354c5940'; // Receipt pre-built model
-
-    // Step 1: Enqueue the extraction job (Mindee v2 API)
-    const enqueueResponse = await fetch('https://api-v2.mindee.net/v2/products/extraction/enqueue', {
-      method: 'POST',
-      headers: {
-        'Authorization': c.env.MINDEE_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model_id: MODEL_ID,
-        file_base64: base64Data
-      })
-    });
-
-    const enqueueText = await enqueueResponse.text();
-
-    if (!enqueueResponse.ok) {
-      console.error('Mindee enqueue error:', enqueueResponse.status, enqueueText);
-      return c.json({
-        error: `Mindee (${enqueueResponse.status}): ${enqueueText.slice(0, 300)}`
-      }, 500);
-    }
-
-    let enqueueData;
+    let aiResponse: { response?: string };
     try {
-      enqueueData = JSON.parse(enqueueText);
-    } catch {
-      return c.json({ error: 'Réponse invalide', debug: enqueueText.slice(0, 500) }, 500);
+      aiResponse = await c.env.AI.run(VISION_MODEL as any, {
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${cleanBase64}` } },
+              { type: 'text', text: EXTRACTION_PROMPT },
+            ],
+          },
+        ],
+        max_tokens: 512,
+      } as any) as { response?: string };
+    } catch (err: any) {
+      console.error('Workers AI error:', err);
+      return c.json({ error: `Workers AI a échoué : ${err.message}` }, 500);
     }
 
-    const jobId = enqueueData.job?.id || enqueueData.id;
-    if (!jobId) {
-      return c.json({ error: 'Pas de job_id', debug: enqueueData }, 500);
+    const rawText = typeof aiResponse?.response === 'string'
+      ? aiResponse.response
+      : JSON.stringify(aiResponse);
+    const parsed = safeParseJson(rawText);
+
+    if (!parsed) {
+      console.error('OCR parse error, raw response:', rawText.slice(0, 500));
+      return c.json({ error: 'Impossible de parser la réponse du modèle', debug: rawText.slice(0, 500) }, 500);
     }
 
-    // Step 2: Poll for results (max 30 seconds)
-    const maxAttempts = 15;
-    const pollInterval = 2000;
-    let result = null;
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
-
-      const pollResponse = await fetch(`https://api-v2.mindee.net/v2/jobs/${jobId}`, {
-        headers: { 'Authorization': c.env.MINDEE_API_KEY }
-      });
-
-      // Handle redirect (302) - job complete
-      if (pollResponse.status === 302) {
-        const redirectUrl = pollResponse.headers.get('Location');
-        if (redirectUrl) {
-          const docResponse = await fetch(redirectUrl, {
-            headers: { 'Authorization': c.env.MINDEE_API_KEY }
-          });
-          result = await docResponse.json();
-          break;
-        }
-      }
-
-      const pollData = await pollResponse.json().catch(() => null);
-      if (!pollData) continue;
-
-      const status = pollData.job?.status || pollData.status;
-      if (status === 'completed' || status === 'succeeded') {
-        result = pollData;
-        break;
-      } else if (status === 'failed' || status === 'error') {
-        return c.json({ error: 'Extraction échouée', debug: pollData }, 500);
-      }
-    }
-
-    if (!result) {
-      return c.json({ error: 'Timeout - traitement trop long', jobId }, 504);
-    }
-
-    // Step 3: Extract fields from result
-    const inference = result.inference || result.document?.inference || {};
-    const fields = inference.fields || inference.prediction || result.fields || {};
-
-    const getValue = (field: any) => {
-      if (!field) return null;
-      if (typeof field === 'object' && 'value' in field) return field.value;
-      if (typeof field === 'object' && 'content' in field) return field.content;
-      return field;
+    const toNumber = (v: any): number | null => {
+      if (v === null || v === undefined) return null;
+      const n = parseFloat(String(v).replace(',', '.'));
+      return Number.isNaN(n) ? null : n;
     };
 
-    const ocrResult = {
-      supplierName: getValue(fields.supplier_name) || getValue(fields.merchant_name) || getValue(fields.store_name),
-      date: getValue(fields.date) || getValue(fields.purchase_date),
-      time: getValue(fields.time) || getValue(fields.purchase_time),
-      totalAmount: getValue(fields.total_amount) || getValue(fields.total) || getValue(fields.total_incl),
-      totalTax: getValue(fields.total_tax) || getValue(fields.taxes),
-      currency: getValue(fields.currency) || getValue(fields.locale?.currency) || 'EUR',
-      category: getValue(fields.category),
-      subcategory: getValue(fields.subcategory),
-      _debug: result
-    };
-
-    return c.json(ocrResult);
-  } catch (error) {
+    return c.json({
+      supplierName: parsed.supplierName ?? null,
+      date: parsed.date ?? null,
+      time: parsed.time ?? null,
+      totalAmount: toNumber(parsed.totalAmount),
+      currency: parsed.currency ?? null,
+      category: parsed.category ?? null,
+    });
+  } catch (error: any) {
     console.error('OCR error:', error);
-    return c.json({ error: 'Erreur lors de l\'analyse OCR' }, 500);
+    return c.json({ error: 'Erreur lors de l\'analyse OCR', detail: error?.message ?? String(error) }, 500);
   }
 });
 

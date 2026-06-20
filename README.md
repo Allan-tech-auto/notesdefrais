@@ -7,7 +7,7 @@ Application de gestion de notes de frais, déployée sur Cloudflare Workers avec
 - **Backend** : [Hono](https://hono.dev/) sur Cloudflare Workers
 - **Base de données** : Cloudflare D1 (SQLite)
 - **Frontend** : HTML/CSS/JS vanilla (dans `public/`)
-- **OCR** : API Mindee (scan de reçus)
+- **OCR** : Cloudflare Workers AI — `@cf/meta/llama-3.2-11b-vision-instruct`
 - **Auth** : JWT via [jose](https://github.com/panva/jose)
 
 ## Structure
@@ -40,7 +40,16 @@ Application de gestion de notes de frais, déployée sur Cloudflare Workers avec
 | POST | `/api/expenses` | Créer une dépense |
 | PUT | `/api/expenses/:id` | Modifier une dépense |
 | DELETE | `/api/expenses/:id` | Supprimer une dépense |
-| POST | `/api/ocr` | Analyser un reçu (OCR) |
+| POST | `/api/ocr` | Analyser un reçu (OCR via Workers AI) |
+
+## OCR — Cloudflare Workers AI
+
+L'OCR utilise le modèle `@cf/meta/llama-3.2-11b-vision-instruct` via le binding `env.AI`.
+Remplace l'ancienne intégration Mindee (supprimée).
+
+**Quota Workers AI (plan gratuit) :** 10 000 neurons/jour.
+**Plan Workers Paid (5 $/mois) :** facturation au dépassement à 0,011 $/1 000 neurons.
+Suivi de consommation : `dash.cloudflare.com` → Workers & Pages → Vue d'ensemble → onglet **AI**.
 
 ## Installation
 
@@ -52,7 +61,6 @@ npm install
 
 ```bash
 wrangler secret put JWT_SECRET
-wrangler secret put MINDEE_API_KEY
 ```
 
 ## Base de données

@@ -9,6 +9,10 @@ binding = "DB"
 database_name = "notedefrais-db"
 database_id = "64b98187-1fcc-4a3d-a24b-b43f82718469"
 
+# Workers AI
+[ai]
+binding = "AI"
+
 # Variables d'environnement (définir via : wrangler secret put JWT_SECRET)
 # [vars]
 # JWT_SECRET = ""

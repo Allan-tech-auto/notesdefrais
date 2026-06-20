@@ -1211,7 +1211,7 @@ function handleImageFile(file) {
   reader.onload = (ev) => {
     const img = new Image();
     img.onload = () => {
-      const maxDim = 1600;
+      const maxDim = 1024;
       let w = img.width, h = img.height;
       if (w > maxDim || h > maxDim) {
         if (w > h) { h = h * maxDim / w; w = maxDim; }
@@ -1221,10 +1221,10 @@ function handleImageFile(file) {
       canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
-      formPhoto = canvas.toDataURL('image/jpeg', 0.85);
+      formPhoto = canvas.toDataURL('image/jpeg', 0.80);
       document.getElementById('preview-img').src = formPhoto;
       document.getElementById('photo-preview').classList.remove('hidden');
-      runOCR(formPhoto); // Pass image data URL to Mindee
+      runOCR(formPhoto);
     };
     img.src = ev.target.result;
   };
@@ -1262,8 +1262,7 @@ async function handlePdfFile(file) {
     document.getElementById('photo-preview').classList.remove('hidden');
     progress.style.width = '50%';
 
-    // Use Mindee for OCR
-    message.textContent = 'Analyse avec Mindee AI…';
+    message.textContent = 'Analyse du ticket…';
     runOCR(formPhoto);
   } catch (err) {
     message.textContent = '⚠ Erreur PDF : ' + err.message;
@@ -1276,11 +1275,10 @@ async function runOCR(imageData) {
   const progress = document.getElementById('ocr-progress');
   status.classList.remove('success');
   status.classList.add('show');
-  message.textContent = 'Analyse du ticket (Mindee AI)…';
+  message.textContent = 'Analyse du ticket…';
   progress.style.width = '30%';
 
   try {
-    // Call our backend OCR endpoint (Mindee)
     const response = await fetch(API_BASE + '/ocr', {
       method: 'POST',
       headers: {
@@ -1315,22 +1313,15 @@ async function runOCR(imageData) {
       document.getElementById('form-description').value = data.supplierName;
     }
 
-    // Auto-detect category based on Mindee's category
+    // Auto-detect category based on Workers AI category
     const catField = document.getElementById('form-category');
     if (data.category) {
-      const catLower = data.category.toLowerCase();
-      const subCatLower = (data.subcategory || '').toLowerCase();
-
-      if (catLower.includes('transport') || subCatLower.includes('taxi') || subCatLower.includes('uber')) {
+      const cat = data.category.toLowerCase();
+      if (cat === 'transport') {
         catField.value = 'taxi';
-      } else if (subCatLower.includes('train') || subCatLower.includes('sncf')) {
-        catField.value = 'train';
-      } else if (subCatLower.includes('bus') || subCatLower.includes('metro')) {
-        catField.value = catLower.includes('metro') ? 'metro' : 'bus';
-      } else if (catLower.includes('accommodation') || catLower.includes('hotel') || catLower.includes('lodging')) {
+      } else if (cat === 'hebergement') {
         catField.value = 'logement';
-      } else if (catLower.includes('food') || catLower.includes('restaurant') || catLower.includes('meal')) {
-        // Detect meal type by time
+      } else if (cat === 'restaurant') {
         if (data.time) {
           const hour = parseInt(data.time.split(':')[0]);
           if (hour >= 6 && hour < 11) catField.value = 'petit_dej';
@@ -1340,6 +1331,8 @@ async function runOCR(imageData) {
         } else {
           catField.value = 'repas';
         }
+      } else {
+        catField.value = 'autre';
       }
     }
 
@@ -1353,7 +1346,7 @@ async function runOCR(imageData) {
 
     if (found.length > 0) {
       status.classList.add('success');
-      message.textContent = '✓ Mindee : ' + found.join(', ');
+      message.textContent = '✓ ' + found.join(', ');
     } else {
       message.textContent = '⚠ Rien détecté. Saisissez manuellement.';
     }
