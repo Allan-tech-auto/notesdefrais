@@ -1,0 +1,20 @@
+name = "notedefrais-api"
+main = "src/worker/index.ts"
+compatibility_date = "2024-10-11"
+assets = { directory = "./public" }
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "notedefrais-db"
+database_id = "64b98187-1fcc-4a3d-a24b-b43f82718469"
+
+# Variables d'environnement (définir via : wrangler secret put JWT_SECRET)
+# [vars]
+# JWT_SECRET = ""
+# MINDEE_API_KEY = ""
+
+# Pour le développement local
+[dev]
+port = 8787
+local_protocol = "http"

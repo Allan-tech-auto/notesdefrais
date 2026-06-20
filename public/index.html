@@ -1,0 +1,1897 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Notes de frais</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+</script>
+<style>
+:root {
+  --module-1: #6366f1;
+  --module-2: #8b5cf6;
+  --module-3: #ec4899;
+  --module-4: #f97316;
+  --module-5: #10b981;
+  --module-6: #0ea5e9;
+  --module-all: #1e293b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  color: #1e293b;
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+}
+h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
+
+/* Login Screen */
+.login-screen {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+.login-card {
+  background: #fff; padding: 40px 32px;
+  max-width: 420px; width: 100%;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+  border-radius: 16px; text-align: center;
+}
+.login-card h1 { font-size: 26px; margin: 16px 0 8px; color: #1e293b; }
+.login-card .subtitle { color: #64748b; font-size: 14px; line-height: 1.6; margin-bottom: 28px; }
+.disclaimer { font-size: 11px; color: #94a3b8; margin-top: 24px; line-height: 1.5; }
+
+.form-group { margin-bottom: 16px; text-align: left; }
+.form-group label { display: block; font-size: 13px; color: #475569; margin-bottom: 6px; font-weight: 600; }
+
+.tabs { display: flex; margin-bottom: 24px; background: #f1f5f9; border-radius: 10px; padding: 4px; }
+.tab {
+  flex: 1; padding: 10px; background: none; border: none; cursor: pointer;
+  font-size: 14px; color: #64748b; border-radius: 8px; transition: all 0.2s; font-weight: 500;
+}
+.tab.active { background: #fff; color: #1e293b; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+.forgot-link { display: block; text-align: right; font-size: 13px; color: #6366f1; margin-top: 8px; cursor: pointer; font-weight: 500; }
+.forgot-link:hover { text-decoration: underline; }
+
+input, select, button { font-family: inherit; font-size: 15px; }
+input[type=text], input[type=email], input[type=password], input[type=number], input[type=date], input[type=time], select {
+  width: 100%; padding: 12px 14px;
+  border: 2px solid #e2e8f0; border-radius: 10px;
+  background: #fff; font-size: 15px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+input:focus, select:focus {
+  outline: none; border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: #475569; margin-bottom: 6px; font-weight: 600;
+}
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 20px; font-size: 14px;
+  border: none; border-radius: 10px; cursor: pointer;
+  font-weight: 600; transition: all 0.2s;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-primary {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(99,102,241,0.4);
+}
+.btn-primary:hover { box-shadow: 0 6px 20px rgba(99,102,241,0.5); }
+.btn-secondary { background: #fff; color: #1e293b; border: 2px solid #e2e8f0; }
+.btn-secondary:hover { border-color: #6366f1; color: #6366f1; }
+.btn-ghost { background: #f1f5f9; color: #475569; border: none; }
+.btn-ghost:hover { background: #e2e8f0; }
+.btn-small { padding: 8px 14px; font-size: 13px; }
+.btn-full { width: 100%; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* App Layout */
+.app { display: none; }
+header.app-header {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  padding: 16px 20px;
+  display: flex; justify-content: space-between; align-items: center;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 700; font-size: 18px; color: #fff;
+}
+.user-info { display: flex; align-items: center; gap: 10px; color: #cbd5e1; font-size: 14px; }
+.icon-btn {
+  background: rgba(255,255,255,0.1); border: none; padding: 8px 12px; cursor: pointer;
+  color: #fff; display: inline-flex; align-items: center; font-size: 14px;
+  border-radius: 8px; transition: background 0.2s;
+}
+.icon-btn:hover { background: rgba(255,255,255,0.2); }
+
+main { max-width: 960px; margin: 0 auto; padding: 24px 16px 80px; }
+
+/* Module Tabs */
+.module-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  padding: 4px 0 8px;
+  -webkit-overflow-scrolling: touch;
+}
+.module-tab {
+  padding: 10px 18px;
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 25px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  color: #64748b;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.module-tab:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.module-tab[data-module=""] { border-color: var(--module-all); color: var(--module-all); }
+.module-tab[data-module="Module 1"] { border-color: var(--module-1); color: var(--module-1); }
+.module-tab[data-module="Module 2"] { border-color: var(--module-2); color: var(--module-2); }
+.module-tab[data-module="Module 3"] { border-color: var(--module-3); color: var(--module-3); }
+.module-tab[data-module="Module 4"] { border-color: var(--module-4); color: var(--module-4); }
+.module-tab[data-module="Module 5"] { border-color: var(--module-5); color: var(--module-5); }
+.module-tab[data-module="Module 6"] { border-color: var(--module-6); color: var(--module-6); }
+
+.module-tab.active {
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+}
+.module-tab.active[data-module=""] { background: var(--module-all); }
+.module-tab.active[data-module="Module 1"] { background: var(--module-1); }
+.module-tab.active[data-module="Module 2"] { background: var(--module-2); }
+.module-tab.active[data-module="Module 3"] { background: var(--module-3); }
+.module-tab.active[data-module="Module 4"] { background: var(--module-4); }
+.module-tab.active[data-module="Module 5"] { background: var(--module-5); }
+.module-tab.active[data-module="Module 6"] { background: var(--module-6); }
+
+.module-tab .tab-count {
+  display: inline-block;
+  background: rgba(0,0,0,0.1);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  margin-left: 6px;
+}
+.module-tab.active .tab-count { background: rgba(255,255,255,0.25); }
+
+/* Cards */
+.card {
+  background: #fff; padding: 24px;
+  margin-bottom: 20px;
+  border: none; border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+.section-title {
+  font-size: 13px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; color: #64748b; margin: 0 0 16px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+.full-row { grid-column: 1 / -1; }
+
+/* Summary Grid */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.summary-card {
+  background: #fff; padding: 16px;
+  border-radius: 14px;
+  border-left: 4px solid;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  transition: transform 0.2s;
+}
+.summary-card:hover { transform: translateY(-2px); }
+.summary-icon { font-size: 22px; }
+.summary-label {
+  font-size: 11px; color: #64748b; text-transform: uppercase;
+  letter-spacing: 0.03em; margin-top: 8px; font-weight: 600;
+}
+.summary-amount {
+  font-size: 22px; font-weight: 800;
+  margin-top: 4px; letter-spacing: -0.02em;
+}
+.summary-count { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+.total-card {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  border-color: #6366f1 !important;
+  color: #fff;
+}
+.total-card .summary-label { color: #94a3b8; }
+.total-card .summary-count { color: #64748b; }
+
+/* Action Buttons */
+.action-row {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.action-row .btn { flex: 1; min-width: 150px; }
+
+/* Messages */
+.error, .info, .success-msg {
+  padding: 14px 18px; border-radius: 12px;
+  margin-bottom: 16px; font-size: 14px;
+  display: none; font-weight: 500;
+}
+.error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.info { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+.success-msg { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+.error.show, .info.show, .success-msg.show { display: block; }
+
+/* Photo Preview & OCR */
+.photo-preview { margin-top: 12px; text-align: center; }
+.photo-preview img {
+  max-width: 100%; max-height: 240px;
+  border-radius: 12px; border: 2px solid #e2e8f0;
+}
+
+.ocr-status {
+  margin-top: 12px; padding: 14px;
+  background: linear-gradient(135deg, #fef9c3 0%, #fef3c7 100%);
+  border: 1px solid #fcd34d;
+  border-radius: 12px; font-size: 14px; color: #92400e;
+  display: none;
+}
+.ocr-status.show { display: block; }
+.ocr-status.success {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  border-color: #34d399; color: #065f46;
+}
+
+.progress-bar {
+  height: 6px; background: #fde68a; border-radius: 3px; margin-top: 8px;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%; background: linear-gradient(90deg, #f59e0b, #d97706);
+  width: 0%; transition: width 0.3s;
+  border-radius: 3px;
+}
+
+/* Expense List */
+.expense-list { display: flex; flex-direction: column; gap: 10px; }
+.expense-row {
+  display: flex; align-items: center; gap: 14px;
+  background: #fff; padding: 14px 16px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  border-left: 4px solid #e2e8f0;
+}
+.expense-row:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+.expense-row[data-module="Module 1"] { border-left-color: var(--module-1); }
+.expense-row[data-module="Module 2"] { border-left-color: var(--module-2); }
+.expense-row[data-module="Module 3"] { border-left-color: var(--module-3); }
+.expense-row[data-module="Module 4"] { border-left-color: var(--module-4); }
+.expense-row[data-module="Module 5"] { border-left-color: var(--module-5); }
+.expense-row[data-module="Module 6"] { border-left-color: var(--module-6); }
+
+.cat-badge {
+  width: 40px; height: 40px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; color: #fff; font-size: 18px;
+}
+.thumb {
+  width: 50px; height: 50px; object-fit: cover;
+  border-radius: 10px; border: 2px solid #e2e8f0; flex-shrink: 0;
+  background: #f1f5f9;
+}
+.expense-info { flex: 1; min-width: 0; }
+.expense-date { font-size: 14px; font-weight: 700; color: #1e293b; }
+.expense-desc {
+  font-size: 13px; color: #64748b;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  margin-top: 2px;
+}
+.expense-amount {
+  font-weight: 800; font-size: 18px; flex-shrink: 0;
+  color: #1e293b;
+}
+.expense-actions { display: flex; gap: 4px; }
+.edit-btn, .delete-btn {
+  background: #f1f5f9; border: none; color: #64748b;
+  cursor: pointer; padding: 8px; font-size: 14px;
+  border-radius: 8px; transition: all 0.2s;
+}
+.edit-btn:hover { background: #dbeafe; color: #2563eb; }
+.delete-btn:hover { background: #fee2e2; color: #dc2626; }
+
+.module-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 8px;
+  color: #fff;
+}
+.module-badge.m1 { background: var(--module-1); }
+.module-badge.m2 { background: var(--module-2); }
+.module-badge.m3 { background: var(--module-3); }
+.module-badge.m4 { background: var(--module-4); }
+.module-badge.m5 { background: var(--module-5); }
+.module-badge.m6 { background: var(--module-6); }
+
+.empty {
+  background: #fff; padding: 48px 24px; text-align: center;
+  color: #64748b; border-radius: 16px;
+  font-size: 15px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+.empty::before {
+  content: '📋';
+  display: block;
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+footer.app-footer {
+  margin-top: 40px; padding: 24px 0;
+  border-top: 2px solid #e2e8f0;
+  font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.6;
+}
+
+.hidden { display: none !important; }
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .module-tabs { gap: 6px; }
+  .module-tab { padding: 8px 12px; font-size: 12px; }
+  .expense-row { padding: 12px; gap: 10px; }
+  .thumb { width: 40px; height: 40px; }
+  .cat-badge { width: 36px; height: 36px; font-size: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div style="font-size: 48px;">🧾</div>
+    <h1>Notes de frais</h1>
+    <p class="subtitle">
+      Outil de suivi des dépenses professionnelles avec OCR.<br>
+      Vos données sont synchronisées sur le cloud.
+    </p>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="login">Connexion</button>
+      <button class="tab" data-tab="register">Inscription</button>
+    </div>
+
+    <div id="login-form">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="login-email" placeholder="votre@email.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>Mot de passe</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+        <span class="forgot-link" id="forgot-link">Mot de passe oublié ?</span>
+      </div>
+      <div class="error" id="login-error"></div>
+      <button class="btn btn-primary btn-full" id="login-btn">Se connecter</button>
+    </div>
+
+    <div id="register-form" class="hidden">
+      <div class="form-group">
+        <label>Nom complet</label>
+        <input type="text" id="register-name" placeholder="Prénom Nom" autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="register-email" placeholder="votre@email.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>Mot de passe (6 caractères min.)</label>
+        <input type="password" id="register-password" placeholder="••••••••" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>Question de récupération</label>
+        <select id="register-question">
+          <option value="Nom de votre premier animal ?">Nom de votre premier animal ?</option>
+          <option value="Ville de naissance de votre mère ?">Ville de naissance de votre mère ?</option>
+          <option value="Nom de votre école primaire ?">Nom de votre école primaire ?</option>
+          <option value="Prénom de votre meilleur ami d'enfance ?">Prénom de votre meilleur ami d'enfance ?</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Réponse secrète</label>
+        <input type="text" id="register-answer" placeholder="Votre réponse">
+      </div>
+      <div class="error" id="register-error"></div>
+      <button class="btn btn-primary btn-full" id="register-btn">Créer un compte</button>
+    </div>
+
+    <div id="forgot-form" class="hidden">
+      <div id="forgot-step1">
+        <div class="form-group">
+          <label>Email de votre compte</label>
+          <input type="email" id="forgot-email" placeholder="votre@email.com">
+        </div>
+        <div class="error" id="forgot-error"></div>
+        <button class="btn btn-primary btn-full" id="forgot-btn">Continuer</button>
+        <div style="height: 10px;"></div>
+        <button class="btn btn-ghost btn-full" id="forgot-back">Retour à la connexion</button>
+      </div>
+      <div id="forgot-step2" class="hidden">
+        <input type="hidden" id="reset-user-id">
+        <div class="form-group">
+          <label id="reset-question-label">Question de sécurité</label>
+          <p id="reset-question-text" style="font-weight: 600; margin: 4px 0 12px;"></p>
+        </div>
+        <div class="form-group">
+          <label>Votre réponse</label>
+          <input type="text" id="reset-answer" placeholder="Réponse secrète">
+        </div>
+        <div class="form-group">
+          <label>Nouveau mot de passe</label>
+          <input type="password" id="reset-password" placeholder="••••••••">
+        </div>
+        <div class="error" id="reset-error"></div>
+        <div class="success-msg" id="reset-success"></div>
+        <button class="btn btn-primary btn-full" id="reset-btn">Réinitialiser</button>
+      </div>
+    </div>
+
+    <p class="disclaimer">
+      ⚠️ Cet outil n'a pas de valeur probante légale. Conservez les justificatifs originaux.
+    </p>
+  </div>
+</div>
+
+<div id="app" class="app">
+  <header class="app-header">
+    <div class="brand">🧾 <span>Notes de frais</span></div>
+    <div class="user-info">
+      <span id="user-display"></span>
+      <button class="icon-btn" id="logout-btn" title="Se déconnecter">↩</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="card">
+      <div class="section-title">Informations de la mission</div>
+      <div class="form-grid">
+        <div>
+          <label>Module</label>
+          <select id="mission-module">
+            <option value="">-- Sélectionner --</option>
+            <option value="Module 1">Module 1</option>
+            <option value="Module 2">Module 2</option>
+            <option value="Module 3">Module 3</option>
+            <option value="Module 4">Module 4</option>
+            <option value="Module 5">Module 5</option>
+            <option value="Module 6">Module 6</option>
+          </select>
+        </div>
+        <div>
+          <label>Lieu</label>
+          <select id="mission-lieu">
+            <option value="Rennes">Rennes</option>
+            <option value="Télétravail">Télétravail</option>
+          </select>
+        </div>
+        <div>
+          <label>Période</label>
+          <input type="text" id="mission-periode" placeholder="Auto-rempli selon le module" readonly>
+        </div>
+      </div>
+    </div>
+
+    <div class="module-tabs" id="module-tabs">
+      <button class="module-tab active" data-module="">Tous</button>
+      <button class="module-tab" data-module="Module 1">Module 1</button>
+      <button class="module-tab" data-module="Module 2">Module 2</button>
+      <button class="module-tab" data-module="Module 3">Module 3</button>
+      <button class="module-tab" data-module="Module 4">Module 4</button>
+      <button class="module-tab" data-module="Module 5">Module 5</button>
+      <button class="module-tab" data-module="Module 6">Module 6</button>
+    </div>
+
+    <div class="summary-grid" id="summary-grid"></div>
+
+    <div class="error" id="error-box"></div>
+    <div class="info" id="info-box"></div>
+
+    <div class="action-row">
+      <button class="btn btn-primary" id="add-btn">+ Nouvelle dépense</button>
+      <button class="btn btn-secondary" id="export-btn">⬇ Exporter en PDF</button>
+    </div>
+
+    <div class="card hidden" id="form-card">
+      <div class="section-title" id="form-title">Nouvelle dépense</div>
+      <input type="hidden" id="form-expense-id">
+      <div class="form-grid">
+        <div class="full-row">
+          <label>📷 Photo, image ou PDF du justificatif</label>
+          <input type="file" id="form-photo" accept="image/*,application/pdf" style="display: none;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-ghost" id="camera-btn" style="flex: 1; min-width: 110px;">📷 Photo</button>
+            <button type="button" class="btn btn-ghost" id="gallery-btn" style="flex: 1; min-width: 110px;">🖼 Galerie</button>
+            <button type="button" class="btn btn-ghost" id="pdf-btn" style="flex: 1; min-width: 110px;">📄 PDF</button>
+          </div>
+          <div class="photo-preview hidden" id="photo-preview">
+            <img id="preview-img" alt="Aperçu">
+          </div>
+          <div class="ocr-status" id="ocr-status">
+            <div id="ocr-message">Lecture du ticket en cours…</div>
+            <div class="progress-bar"><div class="progress-bar-fill" id="ocr-progress"></div></div>
+          </div>
+        </div>
+        <div>
+          <label>📅 Date</label>
+          <input type="date" id="form-date">
+        </div>
+        <div>
+          <label>🕐 Heure</label>
+          <input type="time" id="form-time">
+        </div>
+        <div>
+          <label>Catégorie</label>
+          <select id="form-category">
+            <option value="taxi">🚖 Taxi / VTC</option>
+            <option value="bus">🚌 Bus</option>
+            <option value="metro">🚇 Métro</option>
+            <option value="train">🚆 Train</option>
+            <option value="petit_dej">☕ Petit-déjeuner</option>
+            <option value="dejeuner">🍽 Déjeuner</option>
+            <option value="diner">🌙 Dîner</option>
+            <option value="repas">🍴 Repas (autre)</option>
+            <option value="logement">🏨 Logement</option>
+            <option value="autre">📦 Autre</option>
+          </select>
+        </div>
+        <div>
+          <label>€ Montant TTC</label>
+          <input type="number" step="0.01" min="0" id="form-amount" placeholder="0,00" inputmode="decimal">
+        </div>
+        <div>
+          <label>📁 Module</label>
+          <select id="form-module">
+            <option value="">-- Aucun --</option>
+            <option value="Module 1">Module 1</option>
+            <option value="Module 2">Module 2</option>
+            <option value="Module 3">Module 3</option>
+            <option value="Module 4">Module 4</option>
+            <option value="Module 5">Module 5</option>
+            <option value="Module 6">Module 6</option>
+          </select>
+        </div>
+        <div class="full-row">
+          <label>Description (optionnel)</label>
+          <input type="text" id="form-description" placeholder="Ex : Taxi gare → hôtel">
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 16px;">
+        <button class="btn btn-primary" id="save-btn">Ajouter</button>
+        <button class="btn btn-ghost" id="cancel-btn">Annuler</button>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top: 18px;">📋 Détail des dépenses (<span id="expense-count">0</span>)</div>
+    <div id="expense-list-container"></div>
+
+    <footer class="app-footer">
+      Cet outil n'a pas de valeur probante légale.<br>
+      Conservez les justificatifs originaux pour votre RH.
+    </footer>
+  </main>
+</div>
+
+<script>
+'use strict';
+
+// ============== Configuration ==============
+const API_BASE = '/api';
+
+const MODULES = {
+  'Module 1': '9 au 13 mars 2026',
+  'Module 2': '18 au 22 mai 2026',
+  'Module 3': '15 au 19 juin 2026',
+  'Module 4': '7 au 11 septembre 2026',
+  'Module 5': '5 au 9 octobre 2026',
+  'Module 6': '7 au 11 décembre 2026'
+};
+
+const CATEGORIES = {
+  taxi:      { label: 'Taxi / VTC',       icon: '🚖', color: '#d97706' },
+  bus:       { label: 'Bus',              icon: '🚌', color: '#0891b2' },
+  metro:     { label: 'Métro',            icon: '🚇', color: '#0e7490' },
+  train:     { label: 'Train',            icon: '🚆', color: '#0369a1' },
+  petit_dej: { label: 'Petit-déjeuner',   icon: '☕', color: '#ca8a04' },
+  dejeuner:  { label: 'Déjeuner',         icon: '🍽',  color: '#dc2626' },
+  diner:     { label: 'Dîner',            icon: '🌙', color: '#7c3aed' },
+  repas:     { label: 'Repas',            icon: '🍴', color: '#e11d48' },
+  logement:  { label: 'Logement',         icon: '🏨', color: '#2563eb' },
+  autre:     { label: 'Autre',            icon: '📦', color: '#6b7280' },
+};
+
+const SUMMARY_ORDER = ['taxi', 'bus', 'metro', 'train', 'petit_dej', 'dejeuner', 'diner', 'repas', 'logement', 'autre'];
+
+let currentUser = null;
+let authToken = null;
+let expenses = [];
+let missionInfo = { objet: '', periode: '' };
+let formPhoto = null;
+let editingExpenseId = null;
+let selectedModule = ''; // Filtre par module (vide = tous)
+
+// ============== Storage (Token uniquement) ==============
+function getToken() {
+  try { return localStorage.getItem('auth_token'); } catch { return null; }
+}
+function setToken(token) {
+  try { localStorage.setItem('auth_token', token); } catch {}
+}
+function clearToken() {
+  try { localStorage.removeItem('auth_token'); } catch {}
+}
+
+// ============== API Helpers ==============
+async function api(path, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+
+  const response = await fetch(API_BASE + path, {
+    ...options,
+    headers
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Erreur serveur');
+  }
+
+  return data;
+}
+
+// ============== UI helpers ==============
+function showError(msg) {
+  const box = document.getElementById('error-box');
+  box.textContent = '⚠ ' + msg;
+  box.classList.add('show');
+  setTimeout(() => box.classList.remove('show'), 5000);
+}
+
+function showInfo(msg) {
+  const box = document.getElementById('info-box');
+  box.textContent = 'ℹ ' + msg;
+  box.classList.add('show');
+  setTimeout(() => box.classList.remove('show'), 4000);
+}
+
+function showLoginError(msg) {
+  const box = document.getElementById('login-error');
+  box.textContent = '⚠ ' + msg;
+  box.classList.add('show');
+}
+
+function showRegisterError(msg) {
+  const box = document.getElementById('register-error');
+  box.textContent = '⚠ ' + msg;
+  box.classList.add('show');
+}
+
+function clearAuthErrors() {
+  document.querySelectorAll('.error, .success-msg').forEach(el => el.classList.remove('show'));
+}
+
+// ============== Auth ==============
+async function login() {
+  clearAuthErrors();
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+
+  if (!email || !password) {
+    showLoginError('Email et mot de passe requis');
+    return;
+  }
+
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  btn.textContent = 'Connexion...';
+
+  try {
+    const data = await api('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+
+    authToken = data.token;
+    currentUser = data.user;
+    setToken(authToken);
+    await loadUserData();
+    showApp();
+  } catch (e) {
+    showLoginError(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Se connecter';
+  }
+}
+
+async function register() {
+  clearAuthErrors();
+  const displayName = document.getElementById('register-name').value.trim();
+  const email = document.getElementById('register-email').value.trim();
+  const password = document.getElementById('register-password').value;
+  const question = document.getElementById('register-question').value;
+  const answer = document.getElementById('register-answer').value.trim();
+
+  if (!displayName || !email || !password || !answer) {
+    showRegisterError('Tous les champs sont requis');
+    return;
+  }
+
+  if (password.length < 6) {
+    showRegisterError('Le mot de passe doit faire au moins 6 caractères');
+    return;
+  }
+
+  const btn = document.getElementById('register-btn');
+  btn.disabled = true;
+  btn.textContent = 'Création...';
+
+  try {
+    const data = await api('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, displayName })
+    });
+
+    authToken = data.token;
+    currentUser = data.user;
+    setToken(authToken);
+
+    // Définir la question de sécurité
+    await api('/auth/security-question', {
+      method: 'POST',
+      body: JSON.stringify({ question, answer })
+    });
+
+    await loadUserData();
+    showApp();
+  } catch (e) {
+    showRegisterError(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Créer un compte';
+  }
+}
+
+function logout() {
+  clearToken();
+  authToken = null;
+  currentUser = null;
+  expenses = [];
+  missionInfo = { objet: '', periode: '' };
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  showLoginForm();
+}
+
+// ============== Password Reset ==============
+function showForgotForm() {
+  document.getElementById('login-form').classList.add('hidden');
+  document.getElementById('register-form').classList.add('hidden');
+  document.getElementById('forgot-form').classList.remove('hidden');
+  document.getElementById('forgot-step1').classList.remove('hidden');
+  document.getElementById('forgot-step2').classList.add('hidden');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  clearAuthErrors();
+}
+
+function showLoginForm() {
+  document.getElementById('login-form').classList.remove('hidden');
+  document.getElementById('register-form').classList.add('hidden');
+  document.getElementById('forgot-form').classList.add('hidden');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('[data-tab="login"]').classList.add('active');
+  clearAuthErrors();
+}
+
+async function forgotPassword() {
+  clearAuthErrors();
+  const email = document.getElementById('forgot-email').value.trim();
+
+  if (!email) {
+    document.getElementById('forgot-error').textContent = '⚠ Email requis';
+    document.getElementById('forgot-error').classList.add('show');
+    return;
+  }
+
+  const btn = document.getElementById('forgot-btn');
+  btn.disabled = true;
+  btn.textContent = 'Chargement...';
+
+  try {
+    const data = await api('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+
+    // Affiche la question de sécurité
+    document.getElementById('reset-user-id').value = data.userId;
+    document.getElementById('reset-question-text').textContent = data.question;
+
+    document.getElementById('forgot-step1').classList.add('hidden');
+    document.getElementById('forgot-step2').classList.remove('hidden');
+  } catch (e) {
+    document.getElementById('forgot-error').textContent = '⚠ ' + e.message;
+    document.getElementById('forgot-error').classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Continuer';
+  }
+}
+
+async function resetPassword() {
+  clearAuthErrors();
+  const userId = document.getElementById('reset-user-id').value;
+  const answer = document.getElementById('reset-answer').value.trim();
+  const newPassword = document.getElementById('reset-password').value;
+
+  if (!answer || !newPassword) {
+    document.getElementById('reset-error').textContent = '⚠ Réponse et mot de passe requis';
+    document.getElementById('reset-error').classList.add('show');
+    return;
+  }
+
+  const btn = document.getElementById('reset-btn');
+  btn.disabled = true;
+  btn.textContent = 'Réinitialisation...';
+
+  try {
+    await api('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ userId, answer, newPassword })
+    });
+
+    document.getElementById('reset-success').textContent = 'Mot de passe réinitialisé ! Vous pouvez vous connecter.';
+    document.getElementById('reset-success').classList.add('show');
+
+    setTimeout(() => showLoginForm(), 2000);
+  } catch (e) {
+    document.getElementById('reset-error').textContent = '⚠ ' + e.message;
+    document.getElementById('reset-error').classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Réinitialiser';
+  }
+}
+
+// ============== Data Loading ==============
+async function loadUserData() {
+  try {
+    const [expensesData, missionData] = await Promise.all([
+      api('/expenses'),
+      api('/mission')
+    ]);
+
+    expenses = expensesData.expenses || [];
+    missionInfo = missionData.mission || { objet: '', periode: '' };
+  } catch (e) {
+    console.error('Error loading data:', e);
+    expenses = [];
+    missionInfo = { objet: '', periode: '' };
+  }
+}
+
+async function checkAuth() {
+  const token = getToken();
+  if (!token) return false;
+
+  authToken = token;
+  try {
+    const data = await api('/auth/me');
+    currentUser = data.user;
+    return true;
+  } catch {
+    clearToken();
+    authToken = null;
+    return false;
+  }
+}
+
+// ============== Mission ==============
+let missionSaveTimeout = null;
+
+function updateMissionFromSelects() {
+  const module = document.getElementById('mission-module').value;
+  const lieu = document.getElementById('mission-lieu').value;
+  const periode = MODULES[module] || '';
+
+  document.getElementById('mission-periode').value = periode;
+
+  missionInfo.objet = module ? `${module} — ${lieu}` : '';
+  missionInfo.periode = periode;
+
+  saveMission();
+}
+
+async function saveMission() {
+  if (missionSaveTimeout) clearTimeout(missionSaveTimeout);
+  missionSaveTimeout = setTimeout(async () => {
+    try {
+      await api('/mission', {
+        method: 'PUT',
+        body: JSON.stringify(missionInfo)
+      });
+    } catch (e) {
+      console.error('Error saving mission:', e);
+    }
+  }, 500);
+}
+
+// ============== UI ==============
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('user-display').textContent = '👤 ' + (currentUser?.display_name || 'Utilisateur');
+
+  // Parse mission objet to extract module and lieu
+  if (missionInfo.objet) {
+    const match = missionInfo.objet.match(/^(Module \d+)\s*[—-]\s*(.+)$/);
+    if (match) {
+      document.getElementById('mission-module').value = match[1];
+      document.getElementById('mission-lieu').value = match[2];
+    }
+  }
+  document.getElementById('mission-periode').value = missionInfo.periode || '';
+
+  document.getElementById('form-date').value = new Date().toISOString().split('T')[0];
+  renderSummary();
+  renderExpenseList();
+}
+
+function getFilteredExpenses() {
+  if (!selectedModule) return expenses;
+  return expenses.filter(e => e.module === selectedModule);
+}
+
+function renderSummary() {
+  const grid = document.getElementById('summary-grid');
+  grid.innerHTML = '';
+
+  const filtered = getFilteredExpenses();
+  let grandTotal = 0;
+
+  SUMMARY_ORDER.forEach(catId => {
+    const cat = CATEGORIES[catId];
+    const items = filtered.filter(e => e.category === catId);
+    if (items.length === 0 && catId !== 'taxi' && catId !== 'logement') return;
+    const total = items.reduce((s, e) => s + e.amount, 0);
+    grandTotal += total;
+    const card = document.createElement('div');
+    card.className = 'summary-card';
+    card.style.borderLeftColor = cat.color;
+    card.innerHTML = `
+      <div class="summary-icon" style="color: ${cat.color}">${cat.icon}</div>
+      <div class="summary-label">${cat.label}</div>
+      <div class="summary-amount" style="color: ${cat.color}">${total.toFixed(2)} €</div>
+      <div class="summary-count">${items.length} dépense${items.length > 1 ? 's' : ''}</div>
+    `;
+    grid.appendChild(card);
+  });
+
+  grandTotal = filtered.reduce((s, e) => s + e.amount, 0);
+  const totalCard = document.createElement('div');
+  totalCard.className = 'summary-card total-card';
+  totalCard.innerHTML = `
+    <div class="summary-icon">€</div>
+    <div class="summary-label">Total${selectedModule ? ' ' + selectedModule : ' général'}</div>
+    <div class="summary-amount">${grandTotal.toFixed(2)} €</div>
+    <div class="summary-count">${filtered.length} ligne${filtered.length > 1 ? 's' : ''}</div>
+  `;
+  grid.appendChild(totalCard);
+
+  updateModuleTabCounts();
+}
+
+function updateModuleTabCounts() {
+  document.querySelectorAll('.module-tab').forEach(tab => {
+    const module = tab.dataset.module;
+    const count = module ? expenses.filter(e => e.module === module).length : expenses.length;
+
+    // Remove existing count badge
+    const existingBadge = tab.querySelector('.tab-count');
+    if (existingBadge) existingBadge.remove();
+
+    // Add count badge if there are expenses
+    if (count > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'tab-count';
+      badge.textContent = count;
+      tab.appendChild(badge);
+    }
+  });
+}
+
+function renderExpenseList() {
+  const container = document.getElementById('expense-list-container');
+  const filtered = getFilteredExpenses();
+  document.getElementById('expense-count').textContent = filtered.length;
+
+  if (filtered.length === 0) {
+    const msg = selectedModule
+      ? `Aucune dépense pour ${selectedModule}.<br>Sélectionnez ce module et ajoutez une dépense.`
+      : `Aucune dépense pour l'instant.<br>Cliquez sur « Nouvelle dépense » pour commencer.`;
+    container.innerHTML = `<div class="empty">${msg}</div>`;
+    return;
+  }
+
+  const sorted = [...filtered].sort((a, b) => {
+    const cmp = a.date.localeCompare(b.date);
+    if (cmp !== 0) return cmp;
+    return (a.time || '').localeCompare(b.time || '');
+  });
+
+  const list = document.createElement('div');
+  list.className = 'expense-list';
+
+  for (const exp of sorted) {
+    const cat = CATEGORIES[exp.category] || CATEGORIES.autre;
+    const row = document.createElement('div');
+    row.className = 'expense-row';
+    if (exp.module) row.setAttribute('data-module', exp.module);
+    const timeStr = exp.time ? ' • ' + exp.time : '';
+    const photoSrc = exp.photo_data || 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22/>';
+
+    // Module badge with color
+    let moduleBadge = '';
+    if (exp.module && !selectedModule) {
+      const moduleNum = exp.module.replace('Module ', '');
+      moduleBadge = `<span class="module-badge m${moduleNum}">M${moduleNum}</span>`;
+    }
+
+    row.innerHTML = `
+      <div class="cat-badge" style="background: ${cat.color}">${cat.icon}</div>
+      <img class="thumb" src="${photoSrc}" alt="justif">
+      <div class="expense-info">
+        <div class="expense-date">${formatDate(exp.date)}${timeStr}${moduleBadge}</div>
+        <div class="expense-desc">${escapeHtml(cat.label)}${exp.description ? ' — ' + escapeHtml(exp.description) : ''}</div>
+      </div>
+      <div class="expense-amount">${exp.amount.toFixed(2)} €</div>
+      <div class="expense-actions">
+        <button class="edit-btn" data-id="${exp.id}" title="Modifier">✏️</button>
+        <button class="delete-btn" data-id="${exp.id}" title="Supprimer">🗑</button>
+      </div>
+    `;
+    list.appendChild(row);
+  }
+
+  container.innerHTML = '';
+  container.appendChild(list);
+
+  list.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      editExpense(btn.dataset.id);
+    });
+  });
+
+  list.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteExpense(btn.dataset.id);
+    });
+  });
+}
+
+function formatDate(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  return d.toLocaleDateString('fr-FR');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+async function deleteExpense(id) {
+  if (!confirm('Supprimer cette dépense ?')) return;
+
+  try {
+    await api(`/expenses/${id}`, { method: 'DELETE' });
+    expenses = expenses.filter(e => e.id !== id);
+    renderSummary();
+    renderExpenseList();
+    showInfo('Dépense supprimée');
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+function editExpense(id) {
+  const exp = expenses.find(e => e.id === id);
+  if (!exp) return;
+
+  editingExpenseId = id;
+  document.getElementById('form-title').textContent = 'Modifier la dépense';
+  document.getElementById('form-expense-id').value = id;
+  document.getElementById('form-date').value = exp.date;
+  document.getElementById('form-time').value = exp.time || '';
+  document.getElementById('form-category').value = exp.category;
+  document.getElementById('form-amount').value = exp.amount;
+  document.getElementById('form-description').value = exp.description || '';
+  document.getElementById('form-module').value = exp.module || '';
+  document.getElementById('save-btn').textContent = 'Enregistrer';
+
+  if (exp.photo_data) {
+    formPhoto = exp.photo_data;
+    document.getElementById('preview-img').src = exp.photo_data;
+    document.getElementById('photo-preview').classList.remove('hidden');
+  } else {
+    formPhoto = null;
+    document.getElementById('photo-preview').classList.add('hidden');
+  }
+
+  document.getElementById('form-card').classList.remove('hidden');
+  document.getElementById('form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function showForm(show) {
+  const card = document.getElementById('form-card');
+  card.classList.toggle('hidden', !show);
+  if (show) {
+    editingExpenseId = null;
+    document.getElementById('form-title').textContent = 'Nouvelle dépense';
+    document.getElementById('form-expense-id').value = '';
+    document.getElementById('form-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('form-time').value = '';
+    document.getElementById('form-amount').value = '';
+    document.getElementById('form-description').value = '';
+    document.getElementById('form-category').value = 'taxi';
+    document.getElementById('form-module').value = document.getElementById('mission-module').value || '';
+    document.getElementById('form-photo').value = '';
+    document.getElementById('photo-preview').classList.add('hidden');
+    document.getElementById('ocr-status').classList.remove('show', 'success');
+    document.getElementById('save-btn').textContent = 'Ajouter';
+    formPhoto = null;
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+// ============== Photo / PDF + OCR ==============
+function handlePhoto(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+    handlePdfFile(file);
+  } else {
+    handleImageFile(file);
+  }
+}
+
+function handleImageFile(file) {
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 1600;
+      let w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = h * maxDim / w; w = maxDim; }
+        else { w = w * maxDim / h; h = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      formPhoto = canvas.toDataURL('image/jpeg', 0.85);
+      document.getElementById('preview-img').src = formPhoto;
+      document.getElementById('photo-preview').classList.remove('hidden');
+      runOCR(formPhoto); // Pass image data URL to Mindee
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function handlePdfFile(file) {
+  if (!window.pdfjsLib) {
+    showError('Lecteur PDF non disponible.');
+    return;
+  }
+  const status = document.getElementById('ocr-status');
+  const message = document.getElementById('ocr-message');
+  const progress = document.getElementById('ocr-progress');
+  status.classList.remove('success');
+  status.classList.add('show');
+  message.textContent = 'Conversion du PDF…';
+  progress.style.width = '10%';
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const page = await pdf.getPage(1);
+    progress.style.width = '30%';
+
+    // Render PDF page to image
+    const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better OCR
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    formPhoto = canvas.toDataURL('image/jpeg', 0.90);
+    document.getElementById('preview-img').src = formPhoto;
+    document.getElementById('photo-preview').classList.remove('hidden');
+    progress.style.width = '50%';
+
+    // Use Mindee for OCR
+    message.textContent = 'Analyse avec Mindee AI…';
+    runOCR(formPhoto);
+  } catch (err) {
+    message.textContent = '⚠ Erreur PDF : ' + err.message;
+  }
+}
+
+async function runOCR(imageData) {
+  const status = document.getElementById('ocr-status');
+  const message = document.getElementById('ocr-message');
+  const progress = document.getElementById('ocr-progress');
+  status.classList.remove('success');
+  status.classList.add('show');
+  message.textContent = 'Analyse du ticket (Mindee AI)…';
+  progress.style.width = '30%';
+
+  try {
+    // Call our backend OCR endpoint (Mindee)
+    const response = await fetch(API_BASE + '/ocr', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authToken ? `Bearer ${authToken}` : ''
+      },
+      body: JSON.stringify({ image: imageData })
+    });
+
+    progress.style.width = '80%';
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Erreur OCR');
+    }
+    progress.style.width = '100%';
+
+    // Apply the extracted data
+    if (data.totalAmount) {
+      document.getElementById('form-amount').value = data.totalAmount.toFixed(2);
+    }
+    if (data.date) {
+      document.getElementById('form-date').value = data.date;
+    }
+    if (data.time) {
+      // Format time if needed (Mindee returns HH:MM:SS, we want HH:MM)
+      const timeParts = data.time.split(':');
+      document.getElementById('form-time').value = timeParts.slice(0, 2).join(':');
+    }
+    if (data.supplierName) {
+      document.getElementById('form-description').value = data.supplierName;
+    }
+
+    // Auto-detect category based on Mindee's category
+    const catField = document.getElementById('form-category');
+    if (data.category) {
+      const catLower = data.category.toLowerCase();
+      const subCatLower = (data.subcategory || '').toLowerCase();
+
+      if (catLower.includes('transport') || subCatLower.includes('taxi') || subCatLower.includes('uber')) {
+        catField.value = 'taxi';
+      } else if (subCatLower.includes('train') || subCatLower.includes('sncf')) {
+        catField.value = 'train';
+      } else if (subCatLower.includes('bus') || subCatLower.includes('metro')) {
+        catField.value = catLower.includes('metro') ? 'metro' : 'bus';
+      } else if (catLower.includes('accommodation') || catLower.includes('hotel') || catLower.includes('lodging')) {
+        catField.value = 'logement';
+      } else if (catLower.includes('food') || catLower.includes('restaurant') || catLower.includes('meal')) {
+        // Detect meal type by time
+        if (data.time) {
+          const hour = parseInt(data.time.split(':')[0]);
+          if (hour >= 6 && hour < 11) catField.value = 'petit_dej';
+          else if (hour >= 11 && hour < 15) catField.value = 'dejeuner';
+          else if (hour >= 18 && hour < 23) catField.value = 'diner';
+          else catField.value = 'repas';
+        } else {
+          catField.value = 'repas';
+        }
+      }
+    }
+
+    // Build success message
+    const found = [];
+    if (data.supplierName) found.push('"' + data.supplierName + '"');
+    if (data.totalAmount) found.push(data.totalAmount.toFixed(2) + ' €');
+    if (data.date) found.push('date');
+    if (data.time) found.push('heure');
+    if (data.category) found.push(data.category);
+
+    if (found.length > 0) {
+      status.classList.add('success');
+      message.textContent = '✓ Mindee : ' + found.join(', ');
+    } else {
+      message.textContent = '⚠ Rien détecté. Saisissez manuellement.';
+    }
+  } catch (err) {
+    console.error('OCR error:', err);
+    message.textContent = '⚠ ' + (err.message || 'Erreur OCR');
+  }
+}
+
+function parseReceiptText(text) {
+  const result = { amount: null, date: null, time: null, transportHint: null, businessName: null };
+  if (!text) return result;
+
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  const upperText = text.toUpperCase();
+
+  // Business/Restaurant name detection (usually in first 3 lines)
+  // The business name is typically the FIRST line of the receipt
+
+  // Skip patterns - lines that are NOT business names
+  const skipPatterns = [
+    /^\d+[,.\s]?\d*\s*€?$/, // Just numbers (prices)
+    /^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/, // Dates
+    /^\d{2}:\d{2}/, // Times
+    /^\+?\d[\d\s\-\.]{8,}$/, // Phone numbers
+    /^(tel|fax|tél|siret|siren|tva|n°|numero|adresse|rue|avenue|boulevard|code postal)/i,
+    /^\d+\s+(rue|avenue|boulevard|place|allée)/i, // Addresses
+    /^(ticket|caisse|table|serveur|client|facture|reçu|addition|total|sous-total)/i,
+    /^www\.|^http|\.com|\.fr/i, // URLs
+    /^[\*\-=_]{3,}$/, // Separators
+    /^(merci|bienvenue|à bientôt|au revoir)/i, // Greetings
+    /\d+[,\.]\d{2}\s*€?$/, // Lines ending with prices
+    /^(demo|test)\s/i, // Demo/test lines
+    /\d+\s*[xX]\s*\d/, // Quantity patterns like "2 x 5"
+    /^[A-Z0-9]+\d$/, // Codes ending with number like "FRINGUE1"
+    /^\d/, // Lines starting with numbers
+  ];
+
+  // Patterns that look like product/item lines (should be skipped)
+  const productPatterns = [
+    /\d+\s*€/, // Contains price
+    /\d+[,\.]\d{2}/, // Contains decimal number (price)
+    /^[A-Z\s]+\d+$/, // ALLCAPS followed by number (item code)
+    /qte|qty|quantité/i, // Quantity indicators
+  ];
+
+  // Known restaurant/business indicators (high confidence)
+  const businessIndicators = [
+    /restaurant/i, /brasserie/i, /café/i, /cafe/i, /bistro/i, /pizzeria/i,
+    /boulangerie/i, /pâtisserie/i, /patisserie/i, /traiteur/i, /bar\b/i, /pub\b/i,
+    /hôtel/i, /hotel/i, /grill/i, /tabac/i, /sarl/i, /sas\b/i, /eurl/i,
+    /supermarché/i, /carrefour/i, /leclerc/i, /auchan/i, /lidl/i, /aldi/i,
+    /mcdo|mcdonald/i, /burger/i, /kebab/i, /sushi/i, /wok/i
+  ];
+
+  // First pass: look for line with business indicator
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const line = lines[i];
+    if (businessIndicators.some(p => p.test(line))) {
+      let name = line.replace(/^[\*\-\s]+|[\*\-\s]+$/g, '').replace(/\s+/g, ' ').trim();
+      if (name.length >= 3 && name.length <= 40) {
+        result.businessName = name;
+        break;
+      }
+    }
+  }
+
+  // Second pass: if no indicator found, take first valid line (usually line 1)
+  if (!result.businessName) {
+    for (let i = 0; i < Math.min(lines.length, 3); i++) {
+      const line = lines[i];
+
+      // Skip if line matches skip patterns
+      if (skipPatterns.some(p => p.test(line))) continue;
+
+      // Skip if line looks like a product
+      if (productPatterns.some(p => p.test(line))) continue;
+
+      // Skip very short or very long lines
+      if (line.length < 3 || line.length > 40) continue;
+
+      // Skip lines that are mostly numbers
+      const digits = (line.match(/\d/g) || []).length;
+      if (digits > line.length * 0.3) continue;
+
+      // Skip lines that look like item codes (ALLCAPS + number)
+      if (/^[A-Z\s]{2,}[0-9]+$/.test(line)) continue;
+
+      // Clean up the name
+      let name = line
+        .replace(/^[\*\-\s]+|[\*\-\s]+$/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (name.length >= 3) {
+        result.businessName = name;
+        break; // Take the first valid line
+      }
+    }
+  }
+
+  // Transport detection
+  const transportKeywords = [
+    { regex: /\b(RATP|METRO|MÉTRO)\b/, type: 'metro' },
+    { regex: /\b(SNCF|TGV|TER)\b/, type: 'train' },
+    { regex: /\b(BUS|KEOLIS|STAR)\b/, type: 'bus' },
+    { regex: /\b(UBER|BOLT|TAXI|VTC)\b/, type: 'taxi' },
+    { regex: /\b(HOTEL|HÔTEL|IBIS|NOVOTEL|MERCURE|CAMPANILE|PREMIERE CLASSE|B&B)\b/i, type: 'logement' },
+  ];
+  for (const kw of transportKeywords) {
+    if (kw.regex.test(upperText)) {
+      result.transportHint = kw.type;
+      break;
+    }
+  }
+
+  // Amount
+  const totalKeywords = [
+    { regex: /\btotal\s*ttc\b/i, priority: 5 },
+    { regex: /\bmontant\s*ttc\b/i, priority: 5 },
+    { regex: /\btotal\s*à\s*payer\b/i, priority: 5 },
+    { regex: /\btotal\b/i, priority: 3 },
+    { regex: /\bà\s*payer\b/i, priority: 3 },
+  ];
+  let bestAmount = null;
+  let bestPriority = -1;
+
+  for (const line of lines) {
+    let linePriority = 0;
+    for (const kw of totalKeywords) {
+      if (kw.regex.test(line) && kw.priority > linePriority) {
+        linePriority = kw.priority;
+      }
+    }
+    const matches = [...line.matchAll(/(\d{1,4})[\s.,](\d{2})\b/g)];
+    for (const m of matches) {
+      const value = parseFloat(m[1] + '.' + m[2]);
+      if (value > 0 && value < 10000) {
+        if (linePriority > bestPriority || (linePriority === bestPriority && value > (bestAmount || 0))) {
+          bestAmount = value;
+          bestPriority = linePriority;
+        }
+      }
+    }
+  }
+  result.amount = bestAmount;
+
+  // Date
+  const dateMatch = text.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);
+  if (dateMatch) {
+    let [_, dd, mm, yy] = dateMatch;
+    dd = dd.padStart(2, '0');
+    mm = mm.padStart(2, '0');
+    if (yy.length === 2) yy = '20' + yy;
+    result.date = `${yy}-${mm}-${dd}`;
+  }
+
+  // Time
+  const timeMatch = text.match(/\b([01]?\d|2[0-3])\s*[:hH]\s*([0-5]\d)\b/);
+  if (timeMatch) {
+    result.time = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+  }
+
+  return result;
+}
+
+function categorizeMealByTime(timeStr) {
+  if (!timeStr) return null;
+  const [h] = timeStr.split(':').map(Number);
+  if (h >= 6 && h < 11) return 'petit_dej';
+  if (h >= 11 && h < 15) return 'dejeuner';
+  if (h >= 18 && h < 23) return 'diner';
+  return 'repas';
+}
+
+function applyParsedData(parsed) {
+  if (parsed.amount) document.getElementById('form-amount').value = parsed.amount.toFixed(2);
+  if (parsed.date) document.getElementById('form-date').value = parsed.date;
+  if (parsed.time) document.getElementById('form-time').value = parsed.time;
+
+  // Auto-fill description with business/restaurant name
+  if (parsed.businessName) {
+    const descField = document.getElementById('form-description');
+    if (!descField.value) { // Only if description is empty
+      descField.value = parsed.businessName;
+    }
+  }
+
+  const catField = document.getElementById('form-category');
+  if (catField.value === 'taxi') {
+    if (parsed.transportHint) {
+      catField.value = parsed.transportHint;
+    } else if (parsed.time) {
+      const suggested = categorizeMealByTime(parsed.time);
+      if (suggested) catField.value = suggested;
+    }
+  }
+}
+
+// ============== Save Expense ==============
+async function saveExpense() {
+  const date = document.getElementById('form-date').value;
+  const time = document.getElementById('form-time').value;
+  const category = document.getElementById('form-category').value;
+  const amount = parseFloat(document.getElementById('form-amount').value);
+  const description = document.getElementById('form-description').value.trim();
+
+  if (!date) { showError('Date requise'); return; }
+  if (isNaN(amount) || amount <= 0) { showError('Montant requis et > 0'); return; }
+  if (!formPhoto && !editingExpenseId) { showError('Photo du justificatif obligatoire'); return; }
+
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Envoi...';
+
+  try {
+    // Get module from form selector
+    const currentModule = document.getElementById('form-module').value || undefined;
+
+    const payload = {
+      date,
+      time: time || undefined,
+      category,
+      amount,
+      description: description || undefined,
+      photo: formPhoto || undefined,
+      module: currentModule
+    };
+
+    if (editingExpenseId) {
+      // Update
+      const data = await api(`/expenses/${editingExpenseId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      const idx = expenses.findIndex(e => e.id === editingExpenseId);
+      if (idx >= 0) expenses[idx] = data.expense;
+      showInfo('Dépense modifiée');
+    } else {
+      // Create
+      const data = await api('/expenses', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      expenses.push(data.expense);
+      showInfo('Dépense ajoutée');
+    }
+
+    showForm(false);
+    renderSummary();
+    renderExpenseList();
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = editingExpenseId ? 'Enregistrer' : 'Ajouter';
+  }
+}
+
+// ============== PDF ==============
+async function generatePDF() {
+  const filtered = getFilteredExpenses();
+
+  if (filtered.length === 0) {
+    showError(selectedModule ? `Aucune dépense pour ${selectedModule}` : 'Aucune dépense à exporter');
+    return;
+  }
+
+  const btn = document.getElementById('export-btn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Génération…';
+
+  try {
+    const sorted = [...filtered].sort((a, b) => {
+      const cmp = a.date.localeCompare(b.date);
+      if (cmp !== 0) return cmp;
+      return (a.time || '').localeCompare(b.time || '');
+    });
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const displayName = currentUser?.display_name || 'Utilisateur';
+    const pageW = 210, pageH = 297, margin = 15;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    const pdfTitle = selectedModule ? `NOTE DE FRAIS — ${selectedModule}` : 'NOTE DE FRAIS';
+    doc.text(pdfTitle, margin, 20);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text('Émise le ' + new Date().toLocaleDateString('fr-FR'), pageW - margin, 20, { align: 'right' });
+
+    doc.setTextColor(0);
+    doc.setFontSize(11);
+    let y = 35;
+    doc.setFont('helvetica', 'bold'); doc.text('Bénéficiaire :', margin, y);
+    doc.setFont('helvetica', 'normal'); doc.text(displayName, margin + 35, y);
+    y += 6;
+    if (missionInfo.objet) {
+      doc.setFont('helvetica', 'bold'); doc.text('Mission :', margin, y);
+      doc.setFont('helvetica', 'normal'); doc.text(missionInfo.objet, margin + 35, y);
+      y += 6;
+    }
+    if (missionInfo.periode) {
+      doc.setFont('helvetica', 'bold'); doc.text('Période :', margin, y);
+      doc.setFont('helvetica', 'normal'); doc.text(missionInfo.periode, margin + 35, y);
+      y += 6;
+    }
+    y += 4;
+
+    doc.setFillColor(30, 30, 30);
+    doc.rect(margin, y, pageW - 2 * margin, 8, 'F');
+    doc.setTextColor(255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('N°', margin + 2, y + 5.5);
+    doc.text('DATE', margin + 12, y + 5.5);
+    doc.text('HEURE', margin + 32, y + 5.5);
+    doc.text('CATÉGORIE', margin + 47, y + 5.5);
+    doc.text('DESCRIPTION', margin + 85, y + 5.5);
+    doc.text('MONTANT TTC', pageW - margin - 2, y + 5.5, { align: 'right' });
+    y += 8;
+
+    doc.setTextColor(0);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+
+    const totalsByCategory = {};
+    SUMMARY_ORDER.forEach(c => totalsByCategory[c] = 0);
+
+    sorted.forEach((exp, idx) => {
+      if (y > pageH - 30) { doc.addPage(); y = 20; }
+      if (idx % 2 === 0) {
+        doc.setFillColor(248, 248, 248);
+        doc.rect(margin, y, pageW - 2 * margin, 7, 'F');
+      }
+      const cat = CATEGORIES[exp.category] || CATEGORIES.autre;
+      totalsByCategory[exp.category] = (totalsByCategory[exp.category] || 0) + exp.amount;
+      doc.text(String(idx + 1), margin + 2, y + 5);
+      doc.text(formatDate(exp.date), margin + 12, y + 5);
+      doc.text(exp.time || '-', margin + 32, y + 5);
+      doc.text(cat.label, margin + 47, y + 5);
+      const desc = exp.description || '-';
+      const truncDesc = desc.length > 32 ? desc.slice(0, 30) + '...' : desc;
+      doc.text(truncDesc, margin + 85, y + 5);
+      doc.text(exp.amount.toFixed(2) + ' €', pageW - margin - 2, y + 5, { align: 'right' });
+      y += 7;
+    });
+
+    y += 4;
+    doc.setDrawColor(30, 30, 30);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageW - margin, y);
+    y += 6;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('TOTAUX PAR CATÉGORIE', margin, y);
+    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    let grandTotal = 0;
+    SUMMARY_ORDER.forEach(catId => {
+      const v = totalsByCategory[catId] || 0;
+      grandTotal += v;
+      if (v > 0) {
+        if (y > pageH - 25) { doc.addPage(); y = 20; }
+        doc.text(CATEGORIES[catId].label, margin + 5, y);
+        doc.text(v.toFixed(2) + ' €', margin + 80, y, { align: 'right' });
+        y += 5;
+      }
+    });
+    y += 2;
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, margin + 85, y);
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('TOTAL GÉNÉRAL', margin + 5, y);
+    doc.text(grandTotal.toFixed(2) + ' €', margin + 80, y, { align: 'right' });
+    y += 12;
+
+    if (y > pageH - 40) { doc.addPage(); y = 20; }
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(80);
+    doc.text("Je certifie sur l'honneur l'exactitude des dépenses ci-dessus.", margin, y);
+    y += 10;
+    doc.text('Signature :', margin, y);
+    doc.text('Date :', pageW - margin - 60, y);
+
+    // Annexe : justificatifs
+    for (let idx = 0; idx < sorted.length; idx++) {
+      const exp = sorted[idx];
+      doc.addPage();
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(0);
+      const cat = CATEGORIES[exp.category] || CATEGORIES.autre;
+      doc.text('Justificatif n°' + (idx + 1) + ' — ' + cat.label, margin, 20);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(80);
+      const meta = formatDate(exp.date) + (exp.time ? ' à ' + exp.time : '') +
+                   '   •   ' + exp.amount.toFixed(2) + ' €' +
+                   (exp.description ? '   •   ' + exp.description : '');
+      doc.text(meta, margin, 27);
+
+      const photo = exp.photo_data || null;
+      if (photo) {
+        try {
+          doc.addImage(photo, 'JPEG', margin, 35, pageW - 2 * margin, pageH - 50, undefined, 'MEDIUM');
+        } catch (err) {
+          doc.setTextColor(200, 0, 0);
+          doc.text("Erreur d'insertion de l'image", margin, 50);
+        }
+      } else {
+        doc.setTextColor(150);
+        doc.text("Image non disponible", margin, 50);
+      }
+    }
+
+    const moduleStr = selectedModule ? '_' + selectedModule.replace(/\s+/g, '') : '';
+    const filename = 'Note_de_frais_' + displayName.replace(/\s+/g, '_') + moduleStr + '_' + new Date().toISOString().split('T')[0] + '.pdf';
+    doc.save(filename);
+  } catch (err) {
+    showError('Erreur génération PDF : ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+// ============== Events ==============
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+
+    const isLogin = tab.dataset.tab === 'login';
+    document.getElementById('login-form').classList.toggle('hidden', !isLogin);
+    document.getElementById('register-form').classList.toggle('hidden', isLogin);
+    document.getElementById('forgot-form').classList.add('hidden');
+    clearAuthErrors();
+  });
+});
+
+// Auth
+document.getElementById('login-btn').addEventListener('click', login);
+document.getElementById('login-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-password').focus(); });
+document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+
+document.getElementById('register-btn').addEventListener('click', register);
+document.getElementById('register-password').addEventListener('keydown', e => { if (e.key === 'Enter') register(); });
+
+document.getElementById('logout-btn').addEventListener('click', logout);
+
+// Password reset
+document.getElementById('forgot-link').addEventListener('click', showForgotForm);
+document.getElementById('forgot-back').addEventListener('click', showLoginForm);
+document.getElementById('forgot-btn').addEventListener('click', forgotPassword);
+document.getElementById('reset-btn').addEventListener('click', resetPassword);
+
+// Mission
+document.getElementById('mission-module').addEventListener('change', updateMissionFromSelects);
+document.getElementById('mission-lieu').addEventListener('change', updateMissionFromSelects);
+
+// Module tabs
+document.querySelectorAll('.module-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.module-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    selectedModule = tab.dataset.module;
+
+    // Sync the module dropdown with selected tab
+    if (selectedModule && document.getElementById('mission-module').value !== selectedModule) {
+      document.getElementById('mission-module').value = selectedModule;
+      updateMissionFromSelects();
+    }
+
+    renderSummary();
+    renderExpenseList();
+  });
+});
+
+// App
+document.getElementById('add-btn').addEventListener('click', () => showForm(true));
+document.getElementById('cancel-btn').addEventListener('click', () => showForm(false));
+document.getElementById('save-btn').addEventListener('click', saveExpense);
+document.getElementById('form-photo').addEventListener('change', handlePhoto);
+
+document.getElementById('camera-btn').addEventListener('click', () => {
+  const input = document.getElementById('form-photo');
+  input.setAttribute('capture', 'environment');
+  input.setAttribute('accept', 'image/*');
+  input.click();
+});
+document.getElementById('gallery-btn').addEventListener('click', () => {
+  const input = document.getElementById('form-photo');
+  input.removeAttribute('capture');
+  input.setAttribute('accept', 'image/*');
+  input.click();
+});
+document.getElementById('pdf-btn').addEventListener('click', () => {
+  const input = document.getElementById('form-photo');
+  input.removeAttribute('capture');
+  input.setAttribute('accept', 'application/pdf');
+  input.click();
+});
+
+document.getElementById('export-btn').addEventListener('click', generatePDF);
+
+document.getElementById('form-time').addEventListener('change', e => {
+  const time = e.target.value;
+  if (!time) return;
+  const currentCat = document.getElementById('form-category').value;
+  const mealCats = ['repas', 'petit_dej', 'dejeuner', 'diner'];
+  if (mealCats.includes(currentCat)) {
+    const suggested = categorizeMealByTime(time);
+    if (suggested && suggested !== currentCat) {
+      document.getElementById('form-category').value = suggested;
+    }
+  }
+});
+
+// Init
+(async function init() {
+  const isAuth = await checkAuth();
+  if (isAuth) {
+    await loadUserData();
+    showApp();
+  }
+})();
+</script>
+
+</body>
+</html>
