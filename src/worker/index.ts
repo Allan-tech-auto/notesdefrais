@@ -376,9 +376,9 @@ const SYSTEM_PROMPT = `You are a JSON-only data extraction assistant. You MUST r
 
 const EXTRACTION_PROMPT = `Look at this receipt image carefully. Extract data and return ONLY a valid JSON object, no other text.
 
-{"supplierName":"business name at the top of the receipt","date":"read the date printed on the receipt and convert to YYYY-MM-DD format (e.g. 15/03/2025 becomes 2025-03-15)","time":"time printed on the receipt in HH:MM 24h format","totalAmount":14.50,"currency":"EUR","category":"repas (restaurant/food/meal/bar), taxi (taxi/VTC/uber), bus, metro, train, logement (hotel), autre"}
+{"supplierName":"the text written in ALL CAPS or as the largest heading at the very top of the document — never use a signature, handwriting, or footer text","date":"read the date printed on the receipt and convert to YYYY-MM-DD format (e.g. 15/03/2025 becomes 2025-03-15)","time":"time printed on the receipt in HH:MM 24h format","totalAmount":14.50,"currency":"EUR","category":"logement (hotel/hebergement/accommodation/chambre/nuit), repas (restaurant/food/meal/bar), taxi (taxi/VTC/uber), bus, metro, train, autre"}
 
-Important: never use the word null. If a field is missing, use empty string. totalAmount must be a number.`;
+Important: never use the word null. If a field is missing, use empty string. totalAmount must be a number and must be the TOTAL TTC (all taxes included) — never the HT or pre-tax amount.`;
 
 function stripBase64Prefix(base64: string): string {
   return base64.includes(',') ? base64.split(',')[1] : base64;
@@ -461,15 +461,17 @@ app.post('/api/ocr', async (c) => {
     const normalizeCategory = (v: any): string => {
       const c = (clean(v) ?? '').toLowerCase();
       if (!c) return 'autre';
-      const isMeal = ['repas','restaurant','food','meal','bar','brasserie','café','cafe','alimentation',
-        'dejeuner','déjeuner','diner','dîner','petit','breakfast','lunch','dinner','bistro','pizz',
+      if (['hotel','hôtel','logement','hébergement','hebergement','airbnb','ibis','novotel','mercure',
+        'marriott','hilton','accor','formule 1','b&b hotel','chambre','nuit','accommodation','séjour',
+        'sejour'].some(k => c.includes(k))) return 'logement';
+      const isMeal = ['repas','restaurant','food','meal','brasserie','café','cafe','alimentation',
+        'dejeuner','déjeuner','diner','dîner','breakfast','lunch','dinner','bistro','pizz',
         'burger','kebab','sushi','traiteur','cantine','snack','buffet','mcd','mcdo','kfc','subway'].some(k => c.includes(k));
       if (isMeal) return 'repas';
       if (['taxi','vtc','uber','bolt','heetch','cab'].some(k => c.includes(k))) return 'taxi';
       if (c.includes('bus') || c.includes('car ') || c.includes('autocar')) return 'bus';
       if (c.includes('metro') || c.includes('métro') || c.includes('rer')) return 'metro';
       if (['train','sncf','tgv','intercités','ouigo','rail','eurostar'].some(k => c.includes(k))) return 'train';
-      if (['hotel','hôtel','logement','hébergement','hebergement','airbnb','ibis','novotel','chambre'].some(k => c.includes(k))) return 'logement';
       return 'autre';
     };
 

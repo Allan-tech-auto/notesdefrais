@@ -47,6 +47,22 @@ Application de gestion de notes de frais, déployée sur Cloudflare Workers avec
 L'OCR utilise le modèle `@cf/meta/llama-3.2-11b-vision-instruct` via le binding `env.AI`.
 Remplace l'ancienne intégration Mindee (supprimée).
 
+**Champs extraits :**
+- `supplierName` — texte en ALL CAPS ou plus grand titre en haut du document (jamais une signature)
+- `date` — convertie en `YYYY-MM-DD`
+- `time` — format `HH:MM`
+- `totalAmount` — montant **TTC** uniquement (jamais HT)
+- `currency` — devise (défaut `EUR`)
+- `category` — voir ci-dessous
+
+**Catégories détectées (ordre de priorité) :**
+1. `logement` — hotel, hébergement, airbnb, Ibis, Mercure, Marriott, Hilton…
+2. `repas` → décliné en `petit_dej`, `dejeuner`, `diner` selon l'heure
+3. `taxi`, `bus`, `metro`, `train`
+4. `autre`
+
+Le logement est vérifié en premier pour éviter qu'une facture d'hôtel incluant un poste "petit-déjeuner" ne soit classée en repas.
+
 **Quota Workers AI (plan gratuit) :** 10 000 neurons/jour.
 **Plan Workers Paid (5 $/mois) :** facturation au dépassement à 0,011 $/1 000 neurons.
 Suivi de consommation : `dash.cloudflare.com` → Workers & Pages → Vue d'ensemble → onglet **AI**.
