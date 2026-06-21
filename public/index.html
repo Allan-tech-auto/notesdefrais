@@ -477,11 +477,37 @@ footer.app-footer {
     <div class="brand">🧾 <span>Notes de frais</span></div>
     <div class="user-info">
       <span id="user-display"></span>
+      <button class="icon-btn" id="profile-btn" title="Mon profil">⚙</button>
       <button class="icon-btn" id="logout-btn" title="Se déconnecter">↩</button>
     </div>
   </header>
 
   <main>
+    <div class="card hidden" id="profile-card">
+      <div class="section-title">Mon profil</div>
+      <div class="form-grid">
+        <div class="full-row">
+          <label>Question de récupération</label>
+          <select id="profile-question">
+            <option value="Nom de votre premier animal ?">Nom de votre premier animal ?</option>
+            <option value="Ville de naissance de votre mère ?">Ville de naissance de votre mère ?</option>
+            <option value="Nom de votre école primaire ?">Nom de votre école primaire ?</option>
+            <option value="Prénom de votre meilleur ami d'enfance ?">Prénom de votre meilleur ami d'enfance ?</option>
+          </select>
+        </div>
+        <div class="full-row">
+          <label>Réponse secrète</label>
+          <input type="password" id="profile-answer" placeholder="Votre réponse">
+        </div>
+      </div>
+      <div class="error hidden" id="profile-error"></div>
+      <div class="success-msg hidden" id="profile-success"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-primary" id="profile-save-btn">Enregistrer</button>
+        <button class="btn btn-secondary" id="profile-cancel-btn">Annuler</button>
+      </div>
+    </div>
+
     <div class="card">
       <div class="section-title">Informations de la mission</div>
       <div class="form-grid">
@@ -1830,6 +1856,54 @@ document.getElementById('register-btn').addEventListener('click', register);
 document.getElementById('register-password').addEventListener('keydown', e => { if (e.key === 'Enter') register(); });
 
 document.getElementById('logout-btn').addEventListener('click', logout);
+
+// ============== Profil ==============
+document.getElementById('profile-btn').addEventListener('click', () => {
+  const card = document.getElementById('profile-card');
+  card.classList.toggle('hidden');
+  document.getElementById('profile-answer').value = '';
+  document.getElementById('profile-error').classList.add('hidden');
+  document.getElementById('profile-success').classList.add('hidden');
+});
+
+document.getElementById('profile-cancel-btn').addEventListener('click', () => {
+  document.getElementById('profile-card').classList.add('hidden');
+});
+
+document.getElementById('profile-save-btn').addEventListener('click', async () => {
+  const question = document.getElementById('profile-question').value;
+  const answer = document.getElementById('profile-answer').value.trim();
+  const errEl = document.getElementById('profile-error');
+  const okEl = document.getElementById('profile-success');
+  errEl.classList.add('hidden');
+  okEl.classList.add('hidden');
+
+  if (!answer) {
+    errEl.textContent = 'La réponse ne peut pas être vide.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('profile-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Enregistrement…';
+  try {
+    await api('/auth/security-question', {
+      method: 'POST',
+      body: JSON.stringify({ question, answer })
+    });
+    okEl.textContent = '✓ Question de sécurité enregistrée.';
+    okEl.classList.remove('hidden');
+    document.getElementById('profile-answer').value = '';
+    setTimeout(() => document.getElementById('profile-card').classList.add('hidden'), 1500);
+  } catch (e) {
+    errEl.textContent = e.message || 'Erreur serveur.';
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Enregistrer';
+  }
+});
 
 // Password reset
 document.getElementById('forgot-link').addEventListener('click', showForgotForm);
