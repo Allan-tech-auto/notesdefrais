@@ -9,7 +9,8 @@
     "db:migrate": "wrangler d1 execute notedefrais-db --file=schema.sql",
     "db:migrate:local": "wrangler d1 execute notedefrais-db --local --file=schema.sql",
     "r2:create": "wrangler r2 bucket create notedefrais-images",
-    "pages:deploy": "wrangler pages deploy public/"
+    "pages:deploy": "wrangler pages deploy public/",
+    "test:security": "node --import ./tests/security/register.mjs tests/security/auth.test.mjs"
   },
   "dependencies": {
     "hono": "^4.6.0",

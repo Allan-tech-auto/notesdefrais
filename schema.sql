@@ -50,3 +50,6 @@ CREATE TABLE IF NOT EXISTS expenses (
 CREATE INDEX IF NOT EXISTS idx_expenses_user ON expenses(user_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(user_id, date);
 
+
+-- Persistent authentication attempt limits (see migrations/0001_auth_attempts.sql).
+CREATE TABLE IF NOT EXISTS auth_attempts (key TEXT PRIMARY KEY, window INTEGER NOT NULL, attempts INTEGER NOT NULL);

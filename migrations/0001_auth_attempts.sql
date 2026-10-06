@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS auth_attempts (
+  key TEXT PRIMARY KEY,
+  window INTEGER NOT NULL,
+  attempts INTEGER NOT NULL
+);
