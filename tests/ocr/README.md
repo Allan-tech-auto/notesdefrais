@@ -13,3 +13,9 @@ Le script appelle l'API séquentiellement avec la même image, affiche la préci
 ## Référence
 
 Commit de départ : `e3a74e6`. Score réel non mesuré : aucun ticket ni token API disponible. Ne pas optimiser les lots suivants avant ce score. Reporter dans la PR les taux par champ, nombre de tickets, latence et écarts ; comparer chaque lot sur les mêmes fixtures.
+
+## Justificatifs déjà enregistrés
+
+Avec `OCR_INPUT_PREPROCESSED=1`, le banc rejoue l'image stockée telle quelle au lieu d'appliquer une seconde compression. Utiliser ce mode uniquement pour les images déjà envoyées par le front. Le rapport indique ce mode. Les références tirées des dépenses sauvegardées mesurent l'accord avec la saisie : elles ne sont pas nécessairement la vérité imprimée (part remboursable, date de mission, heure ajoutée, description libre).
+
+Référence du 06/10/2026, version production `e2cd71ae-7db8-49ff-8a41-00f2d6b28dfc`, 30 justificatifs existants rejoués sans recompression : accord montant 28/30 (93,3 %), date 23/30 (76,7 %), fournisseur/description 22/30 (73,3 %), catégorie API 20/30 (66,7 %), devise 30/30 (100 %, EUR supposé pour les références), heure brute exacte 10/30 (33,3 % ; le front tronque les secondes ; après cette normalisation, 26/30 soit 86,7 %). Latence moyenne API 3 301 ms, requête moyenne 290 299 octets. Aucun appel en erreur. Les écarts de somme peuvent être légitimes : une facture de 14,93 € a une dépense enregistrée de 11,94 €. Ces taux sont des accords avec la saisie, pas une précision OCR validée champ par champ. Les images et rapports détaillés restent privés hors Git ; aucun compte technique conservé après la mesure.

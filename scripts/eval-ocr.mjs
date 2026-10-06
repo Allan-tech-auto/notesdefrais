@@ -26,7 +26,7 @@ try {
     const row = { file, expected: truth };
     try {
       const bytes = await readFile(resolve(fixtures, file));
-      const image = await page.evaluate(async ({base64, name}) => {
+      const image = process.env.OCR_INPUT_PREPROCESSED === '1' ? `data:image/${/\.png$/i.test(file) ? 'png' : /\.webp$/i.test(file) ? 'webp' : 'jpeg'};base64,${bytes.toString('base64')}` : await page.evaluate(async ({base64, name}) => {
         if (/\.pdf$/i.test(name)) {
           if (!window.pdfjsLib) throw new Error('PDF.js indisponible : vérifier accès au CDN du front.');
         }
@@ -48,6 +48,7 @@ try {
       row.results = Object.fromEntries(fields.map(f => [f, matches(f,row.actual[f],truth[f])]));
     } catch (error) { row.error = error.message; row.results = Object.fromEntries(fields.map(f => [f,false])); }
     rows.push(row);
+    console.log(`Progression : ${rows.length}/${entries.length}${row.error ? ' (erreur)' : ''}`);
   }
 } finally { await browser.close(); }
 console.table(fields.map(field => ({champ:field, réussites:rows.filter(r=>r.results[field]).length, tickets:rows.length, précision:`${(100*rows.filter(r=>r.results[field]).length/rows.length).toFixed(1)} %`})));
@@ -58,5 +59,5 @@ for (const row of rows) {
   if (row.error) console.log(row.file, row.error);
   else for (const field of fields) if (!row.results[field]) console.log(row.file, field, JSON.stringify({attendu:row.expected[field],obtenu:row.actual[field]}));
 }
-await writeFile('tests/ocr/results.json', JSON.stringify({at:new Date().toISOString(),rows},null,2));
+await writeFile('tests/ocr/results.json', JSON.stringify({at:new Date().toISOString(),inputPreprocessed:process.env.OCR_INPUT_PREPROCESSED === '1',rows},null,2));
 if (rows.some(r=>r.error)) process.exitCode = 1;
