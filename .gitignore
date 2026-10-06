@@ -4,3 +4,8 @@ dist/
 .dev.vars
 *.log
 .DS_Store
+
+# Tickets, vérité terrain et rapports OCR : données privées
+/tests/ocr/fixtures/*
+!/tests/ocr/fixtures/expected.example.json
+/tests/ocr/results*.json
