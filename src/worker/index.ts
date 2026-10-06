@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { consumeAuthAttempt } from './security';
 import type { D1Database } from '@cloudflare/workers-types';
 
 import {
@@ -21,10 +22,8 @@ import {
   createExpense,
   deleteExpense,
   updateExpense,
-  updateUserPassword,
   setSecurityQuestion,
-  getSecurityQuestion,
-  verifySecurityAnswer
+  updateUserPassword
 } from './db';
 
 interface Env {
@@ -41,12 +40,12 @@ const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // CORS pour permettre les requêtes depuis le frontend
 app.use('/api/*', cors({
-  origin: '*',
+  origin: (origin, c) => origin === new URL(c.req.url).origin ? origin : '',
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
   exposeHeaders: ['Content-Length'],
   maxAge: 86400,
-  credentials: true
+  credentials: false
 }));
 
 // Middleware d'authentification pour les routes protégées
@@ -57,13 +56,6 @@ app.use('/api/*', async (c, next) => {
     return next();
   }
 
-  // Route semi-publique (auth optionnelle pour définir la question de sécurité)
-  if (c.req.path === '/api/auth/security-question') {
-    const user = await getUserFromRequest(c, c.env.JWT_SECRET);
-    if (user) c.set('user', user);
-    return next();
-  }
-
   const user = await getUserFromRequest(c, c.env.JWT_SECRET);
   if (!user) {
     return c.json({ error: 'Non authentifié' }, 401);
@@ -71,6 +63,32 @@ app.use('/api/*', async (c, next) => {
 
   c.set('user', user);
   return next();
+});
+
+// Persistent limits shared by all Worker instances. Fail closed if D1 is unavailable.
+app.use('/api/auth/*', async (c, next) => {
+  const route = c.req.path.split('/').pop()!;
+  if (!['login', 'register', 'forgot-password', 'reset-password', 'change-password'].includes(route)) return next();
+  if (c.req.method !== 'POST') return next();
+  try {
+    const body = await c.req.raw.clone().json() as Record<string, unknown>;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return c.json({ error: 'Requête invalide' }, 400);
+    for (const value of Object.values(body)) {
+      if (typeof value !== 'string' || value.length > 1024) return c.json({ error: 'Requête invalide' }, 400);
+    }
+    const ip = c.req.header('CF-Connecting-IP') || 'local';
+    const account = route === 'reset-password' ? body.userId : body.email ?? c.get('user')?.sub;
+    const keys = [`ip:${ip}`, ...(typeof account === 'string' ? [`account:${account.trim().toLowerCase()}`] : [])];
+    for (const key of keys) {
+      if (!await consumeAuthAttempt(c.env.DB, key, key.startsWith('ip:') ? 30 : 5)) {
+        c.header('Retry-After', '900');
+        return c.json({ error: 'Trop de tentatives. Réessayez dans 15 minutes.' }, 429);
+      }
+    }
+    return next();
+  } catch {
+    return c.json({ error: 'Authentification temporairement indisponible' }, 503);
+  }
 });
 
 // ==================== AUTH ====================
@@ -84,12 +102,12 @@ app.post('/api/auth/register', async (c) => {
       displayName: string;
     }>();
 
-    if (!email || !password || !displayName) {
+    if (typeof email !== 'string' || typeof password !== 'string' || typeof displayName !== 'string' || !email || !password || !displayName) {
       return c.json({ error: 'Email, mot de passe et nom requis' }, 400);
     }
 
-    if (password.length < 6) {
-      return c.json({ error: 'Le mot de passe doit faire au moins 6 caractères' }, 400);
+    if (password.length < 12) {
+      return c.json({ error: 'Le mot de passe doit faire au moins 12 caractères' }, 400);
     }
 
     // Vérifie si l'email existe déjà
@@ -101,7 +119,7 @@ app.post('/api/auth/register', async (c) => {
     const id = generateId();
     const passwordHash = await hashPassword(password);
     const user = await createUser(c.env.DB, id, email, passwordHash, displayName);
-    const token = await generateToken(user, c.env.JWT_SECRET);
+    const token = await generateToken(user, c.env.JWT_SECRET, passwordHash);
 
     return c.json({ user, token });
   } catch (error) {
@@ -118,7 +136,7 @@ app.post('/api/auth/login', async (c) => {
       password: string;
     }>();
 
-    if (!email || !password) {
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
       return c.json({ error: 'Email et mot de passe requis' }, 400);
     }
 
@@ -133,7 +151,7 @@ app.post('/api/auth/login', async (c) => {
     }
 
     const { password_hash, ...userWithoutPassword } = user;
-    const token = await generateToken(userWithoutPassword, c.env.JWT_SECRET);
+    const token = await generateToken(userWithoutPassword, c.env.JWT_SECRET, user.password_hash);
 
     return c.json({ user: userWithoutPassword, token });
   } catch (error) {
@@ -181,66 +199,23 @@ app.post('/api/auth/security-question', async (c) => {
   }
 });
 
-// Récupérer la question de sécurité (pour reset)
-app.post('/api/auth/forgot-password', async (c) => {
-  try {
-    const { email } = await c.req.json<{ email: string }>();
-
-    if (!email) {
-      return c.json({ error: 'Email requis' }, 400);
-    }
-
-    const data = await getSecurityQuestion(c.env.DB, email);
-
-    if (!data) {
-      return c.json({ error: 'Aucune question de sécurité configurée pour ce compte' }, 404);
-    }
-
-    return c.json({ userId: data.userId, question: data.question });
-  } catch (error) {
-    console.error('Forgot password error:', error);
-    return c.json({ error: 'Erreur serveur' }, 500);
-  }
+app.post('/api/auth/change-password', async (c) => {
+  const { currentPassword, newPassword } = await c.req.json<{ currentPassword: string; newPassword: string }>();
+  if (!currentPassword || !newPassword || newPassword.length < 12) return c.json({ error: 'Mot de passe actuel requis et nouveau mot de passe de 12 caractères minimum' }, 400);
+  const payload = c.get('user')!;
+  const account = await getUserByEmail(c.env.DB, payload.email);
+  if (!account || !await verifyPassword(currentPassword, account.password_hash)) return c.json({ error: 'Mot de passe actuel incorrect' }, 401);
+  const passwordHash = await hashPassword(newPassword);
+  await updateUserPassword(c.env.DB, payload.sub, passwordHash);
+  const { password_hash, ...user } = account;
+  return c.json({ token: await generateToken(user, c.env.JWT_SECRET, passwordHash) });
 });
 
-// Réinitialiser le mot de passe avec la réponse secrète
-app.post('/api/auth/reset-password', async (c) => {
-  try {
-    const { userId, answer, newPassword } = await c.req.json<{
-      userId: string;
-      answer: string;
-      newPassword: string;
-    }>();
-
-    if (!userId || !answer || !newPassword) {
-      return c.json({ error: 'Tous les champs sont requis' }, 400);
-    }
-
-    if (newPassword.length < 6) {
-      return c.json({ error: 'Le mot de passe doit faire au moins 6 caractères' }, 400);
-    }
-
-    const storedHash = await verifySecurityAnswer(c.env.DB, userId);
-
-    if (!storedHash) {
-      return c.json({ error: 'Utilisateur non trouvé' }, 404);
-    }
-
-    const valid = await verifyPassword(answer.toLowerCase().trim(), storedHash);
-
-    if (!valid) {
-      return c.json({ error: 'Réponse incorrecte' }, 401);
-    }
-
-    const passwordHash = await hashPassword(newPassword);
-    await updateUserPassword(c.env.DB, userId, passwordHash);
-
-    return c.json({ success: true, message: 'Mot de passe réinitialisé avec succès' });
-  } catch (error) {
-    console.error('Reset password error:', error);
-    return c.json({ error: 'Erreur serveur' }, 500);
-  }
-});
+// Security questions cannot establish account ownership. Recovery is disabled
+// until a verified, single-use out-of-band recovery flow is available.
+for (const route of ['/api/auth/forgot-password', '/api/auth/reset-password']) {
+  app.post(route, (c) => c.json({ error: 'Réinitialisation automatique désactivée. Contactez l’administrateur.' }, 403));
+}
 
 // ==================== MISSION ====================
 

@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Notes de frais</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -374,17 +374,24 @@ footer.app-footer {
   .cat-badge { width: 36px; height: 36px; font-size: 16px; }
 }
 </style>
+<link rel="stylesheet" href="/design.css">
 </head>
 <body>
 
 <div id="login-screen" class="login-screen">
+  <aside class="login-story" aria-label="Présentation">
+    <div class="story-brand">NOTES DE FRAIS <span>PRO</span></div>
+    <div class="story-content"><p class="eyebrow">MOINS DE PAPERASSE, PLUS DE CLARTÉ</p>
+      <h2>Vos frais.<br>Tout simplement.</h2>
+      <p>Photographiez votre ticket, vérifiez les informations et retrouvez toutes vos dépenses au même endroit.</p>
+      <div class="story-steps"><span>01 · Photographiez</span><span>02 · Vérifiez</span><span>03 · Exportez</span></div>
+    </div>
+    <p class="story-footer">L’essentiel, bien organisé.</p>
+  </aside>
   <div class="login-card">
-    <div style="font-size: 48px;">🧾</div>
+    <div class="brand-mark" aria-hidden="true">N<span>.</span></div>
     <h1>Notes de frais</h1>
-    <p class="subtitle">
-      Outil de suivi des dépenses professionnelles avec OCR.<br>
-      Vos données sont synchronisées sur le cloud.
-    </p>
+    <p class="subtitle">Vos justificatifs, vos dépenses, votre tranquillité.</p>
 
     <div class="tabs">
       <button class="tab active" data-tab="login">Connexion</button>
@@ -393,12 +400,12 @@ footer.app-footer {
 
     <div id="login-form">
       <div class="form-group">
-        <label>Email</label>
-        <input type="email" id="login-email" placeholder="votre@email.com" autocomplete="email">
+        <label for="login-email">Email</label>
+          <input type="email" id="login-email" placeholder="votre@email.com" autocomplete="email">
       </div>
       <div class="form-group">
-        <label>Mot de passe</label>
-        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+        <label for="login-password">Mot de passe</label>
+          <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
         <span class="forgot-link" id="forgot-link">Mot de passe oublié ?</span>
       </div>
       <div class="error" id="login-error"></div>
@@ -407,29 +414,16 @@ footer.app-footer {
 
     <div id="register-form" class="hidden">
       <div class="form-group">
-        <label>Nom complet</label>
-        <input type="text" id="register-name" placeholder="Prénom Nom" autocomplete="name">
+        <label for="register-name">Nom complet</label>
+          <input type="text" id="register-name" placeholder="Prénom Nom" autocomplete="name">
       </div>
       <div class="form-group">
-        <label>Email</label>
-        <input type="email" id="register-email" placeholder="votre@email.com" autocomplete="email">
+        <label for="register-email">Email</label>
+          <input type="email" id="register-email" placeholder="votre@email.com" autocomplete="email">
       </div>
       <div class="form-group">
-        <label>Mot de passe (6 caractères min.)</label>
-        <input type="password" id="register-password" placeholder="••••••••" autocomplete="new-password">
-      </div>
-      <div class="form-group">
-        <label>Question de récupération</label>
-        <select id="register-question">
-          <option value="Nom de votre premier animal ?">Nom de votre premier animal ?</option>
-          <option value="Ville de naissance de votre mère ?">Ville de naissance de votre mère ?</option>
-          <option value="Nom de votre école primaire ?">Nom de votre école primaire ?</option>
-          <option value="Prénom de votre meilleur ami d'enfance ?">Prénom de votre meilleur ami d'enfance ?</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Réponse secrète</label>
-        <input type="text" id="register-answer" placeholder="Votre réponse">
+        <label for="register-password">Mot de passe (12 caractères min.)</label>
+          <input type="password" id="register-password" placeholder="••••••••" autocomplete="new-password">
       </div>
       <div class="error" id="register-error"></div>
       <button class="btn btn-primary btn-full" id="register-btn">Créer un compte</button>
@@ -438,7 +432,7 @@ footer.app-footer {
     <div id="forgot-form" class="hidden">
       <div id="forgot-step1">
         <div class="form-group">
-          <label>Email de votre compte</label>
+          <label for="forgot-email">Email de votre compte</label>
           <input type="email" id="forgot-email" placeholder="votre@email.com">
         </div>
         <div class="error" id="forgot-error"></div>
@@ -453,11 +447,11 @@ footer.app-footer {
           <p id="reset-question-text" style="font-weight: 600; margin: 4px 0 12px;"></p>
         </div>
         <div class="form-group">
-          <label>Votre réponse</label>
+          <label for="reset-answer">Votre réponse</label>
           <input type="text" id="reset-answer" placeholder="Réponse secrète">
         </div>
         <div class="form-group">
-          <label>Nouveau mot de passe</label>
+          <label for="reset-password">Nouveau mot de passe</label>
           <input type="password" id="reset-password" placeholder="••••••••">
         </div>
         <div class="error" id="reset-error"></div>
@@ -474,45 +468,35 @@ footer.app-footer {
 
 <div id="app" class="app">
   <header class="app-header">
-    <div class="brand">🧾 <span>Notes de frais</span></div>
+    <div class="brand"><span class="brand-mark small" aria-hidden="true">N<span>.</span></span><span>Notes de frais <small>ESPACE PERSONNEL</small></span></div>
     <div class="user-info">
       <span id="user-display"></span>
-      <button class="icon-btn" id="profile-btn" title="Mon profil">⚙</button>
-      <button class="icon-btn" id="logout-btn" title="Se déconnecter">↩</button>
+      <button class="icon-btn" id="profile-btn" title="Mon profil" aria-label="Mon profil">⚙</button>
+      <button class="icon-btn" id="logout-btn" title="Se déconnecter" aria-label="Se déconnecter">↩</button>
     </div>
   </header>
 
   <main>
+    <section class="dashboard-intro"><div><p class="eyebrow">VOTRE ESPACE DE TRAVAIL</p><h1>Les frais, en toute clarté.</h1><p>Un justificatif. Une dépense. Tout est à sa place.</p></div><span class="intro-badge"><span aria-hidden="true">●</span> Suivi de mission</span></section>
     <div class="card hidden" id="profile-card">
       <div class="section-title">Mon profil</div>
       <div class="form-grid">
-        <div class="full-row">
-          <label>Question de récupération</label>
-          <select id="profile-question">
-            <option value="Nom de votre premier animal ?">Nom de votre premier animal ?</option>
-            <option value="Ville de naissance de votre mère ?">Ville de naissance de votre mère ?</option>
-            <option value="Nom de votre école primaire ?">Nom de votre école primaire ?</option>
-            <option value="Prénom de votre meilleur ami d'enfance ?">Prénom de votre meilleur ami d'enfance ?</option>
-          </select>
-        </div>
-        <div class="full-row">
-          <label>Réponse secrète</label>
-          <input type="password" id="profile-answer" placeholder="Votre réponse">
-        </div>
+        <label>Mot de passe actuel<input type="password" id="current-password" autocomplete="current-password"></label>
+        <label>Nouveau mot de passe (12 caractères min.)<input type="password" id="new-password" minlength="12" autocomplete="new-password"></label>
       </div>
+      <button class="btn btn-secondary" id="change-password-btn">Changer le mot de passe</button>
       <div class="error hidden" id="profile-error"></div>
       <div class="success-msg hidden" id="profile-success"></div>
       <div style="display:flex;gap:8px;margin-top:12px;">
-        <button class="btn btn-primary" id="profile-save-btn">Enregistrer</button>
         <button class="btn btn-secondary" id="profile-cancel-btn">Annuler</button>
       </div>
     </div>
 
-    <div class="card">
-      <div class="section-title">Informations de la mission</div>
+    <div class="card mission-card">
+      <div class="section-title">Votre mission</div>
       <div class="form-grid">
         <div>
-          <label>Module</label>
+          <label for="mission-module">Module</label>
           <select id="mission-module">
             <option value="">-- Sélectionner --</option>
             <option value="Module 1">Module 1</option>
@@ -524,14 +508,14 @@ footer.app-footer {
           </select>
         </div>
         <div>
-          <label>Lieu</label>
+          <label for="mission-lieu">Lieu</label>
           <select id="mission-lieu">
             <option value="Rennes">Rennes</option>
             <option value="Télétravail">Télétravail</option>
           </select>
         </div>
         <div>
-          <label>Période</label>
+          <label for="mission-periode">Période</label>
           <input type="text" id="mission-periode" placeholder="Auto-rempli selon le module" readonly>
         </div>
       </div>
@@ -554,7 +538,7 @@ footer.app-footer {
 
     <div class="action-row">
       <button class="btn btn-primary" id="add-btn">+ Nouvelle dépense</button>
-      <button class="btn btn-secondary" id="export-btn">⬇ Exporter en PDF</button>
+      <button class="btn btn-secondary" id="export-btn">↓ Exporter en PDF</button>
     </div>
 
     <div class="card hidden" id="form-card">
@@ -562,7 +546,7 @@ footer.app-footer {
       <input type="hidden" id="form-expense-id">
       <div class="form-grid">
         <div class="full-row">
-          <label>📷 Photo, image ou PDF du justificatif</label>
+          <label for="form-photo">📷 Photo, image ou PDF du justificatif</label>
           <input type="file" id="form-photo" accept="image/*,application/pdf" style="display: none;">
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button type="button" class="btn btn-ghost" id="camera-btn" style="flex: 1; min-width: 110px;">📷 Photo</button>
@@ -578,15 +562,15 @@ footer.app-footer {
           </div>
         </div>
         <div>
-          <label>📅 Date</label>
+          <label for="form-date">📅 Date</label>
           <input type="date" id="form-date">
         </div>
         <div>
-          <label>🕐 Heure</label>
+          <label for="form-time">🕐 Heure</label>
           <input type="time" id="form-time">
         </div>
         <div>
-          <label>Catégorie</label>
+          <label for="form-category">Catégorie</label>
           <select id="form-category">
             <option value="taxi">🚖 Taxi / VTC</option>
             <option value="bus">🚌 Bus</option>
@@ -601,11 +585,11 @@ footer.app-footer {
           </select>
         </div>
         <div>
-          <label>€ Montant TTC</label>
+          <label for="form-amount">€ Montant TTC</label>
           <input type="number" step="0.01" min="0" id="form-amount" placeholder="0,00" inputmode="decimal">
         </div>
         <div>
-          <label>📁 Module</label>
+          <label for="form-module">📁 Module</label>
           <select id="form-module">
             <option value="">-- Aucun --</option>
             <option value="Module 1">Module 1</option>
@@ -617,7 +601,7 @@ footer.app-footer {
           </select>
         </div>
         <div class="full-row">
-          <label>Description (optionnel)</label>
+          <label for="form-description">Description (optionnel)</label>
           <input type="text" id="form-description" placeholder="Ex : Taxi gare → hôtel">
         </div>
       </div>
@@ -627,7 +611,7 @@ footer.app-footer {
       </div>
     </div>
 
-    <div class="section-title" style="margin-top: 18px;">📋 Détail des dépenses (<span id="expense-count">0</span>)</div>
+    <div class="expenses-heading"><h2>Vos dépenses</h2><span><span id="expense-count">0</span> justificatifs</span></div>
     <div id="expense-list-container"></div>
 
     <footer class="app-footer">
@@ -781,16 +765,14 @@ async function register() {
   const displayName = document.getElementById('register-name').value.trim();
   const email = document.getElementById('register-email').value.trim();
   const password = document.getElementById('register-password').value;
-  const question = document.getElementById('register-question').value;
-  const answer = document.getElementById('register-answer').value.trim();
 
-  if (!displayName || !email || !password || !answer) {
+  if (!displayName || !email || !password) {
     showRegisterError('Tous les champs sont requis');
     return;
   }
 
-  if (password.length < 6) {
-    showRegisterError('Le mot de passe doit faire au moins 6 caractères');
+  if (password.length < 12) {
+    showRegisterError('Le mot de passe doit faire au moins 12 caractères');
     return;
   }
 
@@ -809,10 +791,7 @@ async function register() {
     setToken(authToken);
 
     // Définir la question de sécurité
-    await api('/auth/security-question', {
-      method: 'POST',
-      body: JSON.stringify({ question, answer })
-    });
+
 
     await loadUserData();
     showApp();
@@ -1101,27 +1080,27 @@ function renderExpenseList() {
     const row = document.createElement('div');
     row.className = 'expense-row';
     if (exp.module) row.setAttribute('data-module', exp.module);
-    const timeStr = exp.time ? ' • ' + exp.time : '';
+    const timeStr = exp.time ? ' • ' + escapeHtml(exp.time) : '';
     const photoSrc = exp.photo_data || 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22/>';
 
     // Module badge with color
     let moduleBadge = '';
     if (exp.module && !selectedModule) {
-      const moduleNum = exp.module.replace('Module ', '');
+      const moduleNum = escapeHtml(exp.module.replace('Module ', ''));
       moduleBadge = `<span class="module-badge m${moduleNum}">M${moduleNum}</span>`;
     }
 
     row.innerHTML = `
       <div class="cat-badge" style="background: ${cat.color}">${cat.icon}</div>
-      <img class="thumb" src="${photoSrc}" alt="justif">
+      <img class="thumb" src="${escapeHtml(photoSrc)}" alt="justif">
       <div class="expense-info">
         <div class="expense-date">${formatDate(exp.date)}${timeStr}${moduleBadge}</div>
         <div class="expense-desc">${escapeHtml(cat.label)}${exp.description ? ' — ' + escapeHtml(exp.description) : ''}</div>
       </div>
       <div class="expense-amount">${exp.amount.toFixed(2)} €</div>
       <div class="expense-actions">
-        <button class="edit-btn" data-id="${exp.id}" title="Modifier">✏️</button>
-        <button class="delete-btn" data-id="${exp.id}" title="Supprimer">🗑</button>
+        <button class="edit-btn" data-id="${escapeHtml(exp.id)}" title="Modifier">✏️</button>
+        <button class="delete-btn" data-id="${escapeHtml(exp.id)}" title="Supprimer">🗑</button>
       </div>
     `;
     list.appendChild(row);
@@ -1861,7 +1840,6 @@ document.getElementById('logout-btn').addEventListener('click', logout);
 document.getElementById('profile-btn').addEventListener('click', () => {
   const card = document.getElementById('profile-card');
   card.classList.toggle('hidden');
-  document.getElementById('profile-answer').value = '';
   document.getElementById('profile-error').classList.add('hidden');
   document.getElementById('profile-success').classList.add('hidden');
 });
@@ -1870,39 +1848,24 @@ document.getElementById('profile-cancel-btn').addEventListener('click', () => {
   document.getElementById('profile-card').classList.add('hidden');
 });
 
-document.getElementById('profile-save-btn').addEventListener('click', async () => {
-  const question = document.getElementById('profile-question').value;
-  const answer = document.getElementById('profile-answer').value.trim();
-  const errEl = document.getElementById('profile-error');
-  const okEl = document.getElementById('profile-success');
-  errEl.classList.add('hidden');
-  okEl.classList.add('hidden');
-
-  if (!answer) {
-    errEl.textContent = 'La réponse ne peut pas être vide.';
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  const btn = document.getElementById('profile-save-btn');
-  btn.disabled = true;
-  btn.textContent = 'Enregistrement…';
+document.getElementById('change-password-btn').addEventListener('click', async () => {
+  const error = document.getElementById('profile-error');
+  const success = document.getElementById('profile-success');
+  const button = document.getElementById('change-password-btn');
+  error.classList.add('hidden'); success.classList.add('hidden'); button.disabled = true;
   try {
-    await api('/auth/security-question', {
-      method: 'POST',
-      body: JSON.stringify({ question, answer })
-    });
-    okEl.textContent = '✓ Question de sécurité enregistrée.';
-    okEl.classList.remove('hidden');
-    document.getElementById('profile-answer').value = '';
-    setTimeout(() => document.getElementById('profile-card').classList.add('hidden'), 1500);
-  } catch (e) {
-    errEl.textContent = e.message || 'Erreur serveur.';
-    errEl.classList.remove('hidden');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Enregistrer';
-  }
+    const data = await api('/auth/change-password', { method: 'POST', body: JSON.stringify({
+      currentPassword: document.getElementById('current-password').value,
+      newPassword: document.getElementById('new-password').value
+    }) });
+    authToken = data.token;
+    setToken(authToken);
+    document.getElementById('current-password').value = '';
+    document.getElementById('new-password').value = '';
+    success.textContent = 'Mot de passe changé. Les autres sessions sont déconnectées.';
+    success.classList.remove('hidden'); success.classList.add('show');
+  } catch (e) { error.textContent = e.message; error.classList.remove('hidden'); error.classList.add('show'); }
+  finally { button.disabled = false; }
 });
 
 // Password reset

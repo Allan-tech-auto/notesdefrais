@@ -11,7 +11,8 @@
     "r2:create": "wrangler r2 bucket create notedefrais-images",
     "pages:deploy": "wrangler pages deploy public/",
     "eval:ocr": "node scripts/eval-ocr.mjs",
-    "test:ocr": "node --test tests/ocr/comparison.test.mjs"
+    "test:ocr": "node --test tests/ocr/comparison.test.mjs",
+    "test:security": "node --import ./tests/security/register.mjs tests/security/auth.test.mjs"
   },
   "dependencies": {
     "hono": "^4.6.0",
